@@ -1,0 +1,227 @@
+<div class="relative w-full h-screen" style="background:var(--cream)">
+  <div #mapContainer class="w-full h-full"></div>
+
+  <!-- Barra superior: marca, filtros, últimos reportes + stats -->
+  <div class="absolute left-0 right-0 top-0 z-1000 overflow-hidden pointer-events-none">
+    <div
+      class="flex flex-wrap items-start gap-4 p-4"
+      style="transition:transform .4s cubic-bezier(.4,0,.2,1), opacity .3s ease"
+      [style.transform]="barraVisible() ? 'translateY(0)' : 'translateY(-115%)'"
+      [style.opacity]="barraVisible() ? 1 : 0"
+    >
+    <div class="soft-card pointer-events-auto flex flex-col gap-4" style="width:min(392px,90vw);padding:20px 22px">
+      <div class="flex items-center gap-2.5">
+        <span style="width:30px;height:30px;border-radius:50%;background:var(--grass);display:grid;place-items:center;flex:none">
+          <span style="width:10px;height:10px;border-radius:50%;background:var(--paper)"></span>
+        </span>
+        <span class="disp" style="font-size:21px">GeoBaches</span>
+      </div>
+
+      <div class="flex flex-wrap gap-2">
+        @for (opcion of estados; track opcion.valor) {
+          <button
+            type="button"
+            (click)="toggleFiltroEstado(opcion.valor)"
+            class="soft-chip"
+            [class.on]="filtroEstado()[opcion.valor]"
+          >
+            {{ opcion.etiqueta }} · {{ conteoPorEstado()[opcion.valor] }}
+          </button>
+        }
+        <button type="button" (click)="toggleSoloAlta()" class="soft-chip" [class.on]="soloAlta()">
+          Solo peligrosas
+        </button>
+      </div>
+
+      @if (ultimosReportes().length) {
+        <div style="height:1px;background:var(--line)"></div>
+        <div class="flex flex-col gap-3">
+          <span class="soft-lab" style="margin:0">Reportes de tu zona</span>
+          @for (bache of ultimosReportes(); track bache.id) {
+            <div class="flex items-center gap-3 fila-seleccionable" (click)="irAlReporte(bache)">
+              <span
+                style="width:38px;height:38px;border-radius:14px;flex:none"
+                [style.background]="colorDeBache(bache)"
+              ></span>
+              <div style="flex:1;min-width:0">
+                <div style="font-weight:700;font-size:14.5px">{{ direccion(bache) }}</div>
+                <div class="text-muted" style="font-size:12.5px">
+                  {{ bache.barrio ? bache.barrio + ' · ' : '' }}{{ bache.usuario }} · {{ tiempoRelativo(bache.fecha) }}
+                </div>
+              </div>
+              <span style="font-size:12.5px;font-weight:700" [style.color]="colorDeBache(bache)">
+                {{ bache.estado === 'reparado' ? 'Listo' : etiquetaSeveridad(bache.severidad) }}
+              </span>
+            </div>
+          }
+        </div>
+      }
+    </div>
+
+    <div class="flex-1"></div>
+
+    @if (stats().total > 0) {
+      <div class="soft-card pointer-events-auto" style="padding:18px 22px;text-align:right">
+        <div class="text-muted" style="font-size:12.5px">Arreglados</div>
+        <div class="disp" style="font-size:40px;line-height:1.05;color:var(--grass)">{{ stats().reparados }}</div>
+        <div class="text-muted" style="font-size:12.5px">de {{ stats().total }} reportados</div>
+        <div style="margin-top:10px;height:8px;border-radius:999px;background:rgba(51,48,43,.08);overflow:hidden">
+          <span
+            style="display:block;height:100%;background:var(--grass);border-radius:999px"
+            [style.width.%]="stats().porcentaje"
+          ></span>
+        </div>
+      </div>
+    }
+    </div>
+  </div>
+
+  <!-- Pestaña para mostrar/ocultar la barra superior -->
+  <button
+    type="button"
+    class="absolute z-1000 pointer-events-auto"
+    style="top:0;left:50%;transform:translateX(-50%);width:40px;height:22px;border-radius:0 0 14px 14px;display:grid;place-items:center;background:var(--paper);box-shadow:0 4px 10px rgba(51,48,43,.12);border:0;cursor:pointer"
+    (click)="toggleBarra()"
+    [attr.aria-label]="barraVisible() ? 'Ocultar barra superior' : 'Mostrar barra superior'"
+  >
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="2"
+      style="width:14px;height:14px;transition:transform .35s ease"
+      [style.transform]="barraVisible() ? 'rotate(0deg)' : 'rotate(180deg)'"
+    >
+      <path d="m18 15-6-6-6 6"></path>
+    </svg>
+  </button>
+
+  @if (error() && !formVisible()) {
+    <div class="absolute z-1000 pointer-events-none" style="top:200px;left:50%;transform:translateX(-50%)">
+      <div class="soft-card" style="padding:10px 18px;background:#fff0ea">
+        <span style="font-size:12.5px;color:var(--danger);font-weight:500">{{ error() }}</span>
+      </div>
+    </div>
+  }
+
+  @if (mensajeExito()) {
+    <div class="absolute z-1000 pointer-events-none" style="top:200px;left:50%;transform:translateX(-50%);max-width:min(360px,88vw)">
+      <div class="soft-card" style="padding:10px 18px;background:rgba(79,138,91,.12);text-align:center">
+        <span style="font-size:12.5px;color:var(--grass);font-weight:500">{{ mensajeExito() }}</span>
+      </div>
+    </div>
+  }
+
+  <!-- Pista de uso -->
+  <div class="absolute left-4 bottom-4 z-1000 soft-card pointer-events-none" style="padding:10px 16px">
+    <span class="text-muted" style="font-size:12.5px">Tocá el mapa donde está el bache</span>
+  </div>
+
+  @if (formVisible()) {
+    <div class="absolute inset-0 z-1000 flex items-center justify-center px-4 pointer-events-none">
+      <div class="pointer-events-auto" style="width:min(342px,100%)">
+        <div class="soft-card flex flex-col gap-4" style="padding:22px;box-shadow:0 18px 44px rgba(51,48,43,.2)">
+          <div class="flex justify-between items-start gap-2.5">
+            <div>
+              <div class="disp" style="font-size:24px">Contanos del bache</div>
+            </div>
+            <button
+              type="button"
+              class="soft-btn ghost"
+              style="width:34px;height:34px;padding:0;border-radius:50%;font-weight:400;font-size:17px"
+              (click)="cancelarReporte()"
+              [disabled]="guardando()"
+              aria-label="Cerrar"
+            >
+              ×
+            </button>
+          </div>
+
+          <div style="font-size:13px;color:rgba(51,48,43,.6);background:rgba(79,138,91,.1);border-radius:12px;padding:10px 13px">
+            {{ clickLatLng()?.lat | number: '1.5-5' }}, {{ clickLatLng()?.lng | number: '1.5-5' }}
+          </div>
+
+          <form (ngSubmit)="guardarBache()" class="flex flex-col gap-4">
+            <div>
+              <label class="soft-lab" for="usuario">¿Quién lo reporta?</label>
+              <input id="usuario" name="usuario" class="soft-in" type="text" [(ngModel)]="usuario" required placeholder="Tu nombre" />
+            </div>
+
+            <div class="flex flex-col gap-2.5">
+              <span class="soft-lab" style="margin:0">
+                Dirección
+                @if (buscandoDireccion()) {
+                  <span style="font-weight:400"> · buscando…</span>
+                } @else {
+                  <span style="font-weight:400"> · la sugerimos por el punto, corregila si hace falta</span>
+                }
+              </span>
+              <div class="flex gap-2.5">
+                <input name="calle" class="soft-in" style="flex:1;min-width:0" type="text" [(ngModel)]="calle" placeholder="Calle" />
+                <input name="altura" class="soft-in" style="width:84px;flex:none" type="text" inputmode="numeric" [(ngModel)]="altura" placeholder="Altura" />
+              </div>
+              <input name="barrio" class="soft-in" type="text" [(ngModel)]="barrio" placeholder="Barrio" />
+            </div>
+
+            <div>
+              <span class="soft-lab">¿Cómo está el bache?</span>
+              <div class="flex gap-2">
+                @for (opcion of severidades; track opcion.valor) {
+                  <button
+                    type="button"
+                    class="sev"
+                    (click)="severidad = opcion.valor"
+                    [style.background]="severidad === opcion.valor ? (opcion.color + '29') : ''"
+                    [style.fontWeight]="severidad === opcion.valor ? 700 : 500"
+                  >
+                    <span style="width:16px;height:16px;border-radius:50%" [style.background]="opcion.color"></span>
+                    {{ opcion.etiqueta }}
+                  </button>
+                }
+              </div>
+            </div>
+
+            <div>
+              <span class="soft-lab">Una foto ayuda a priorizar (opcional)</span>
+              <label
+                for="foto"
+                style="position:relative;display:block;height:96px;border-radius:16px;background:rgba(51,48,43,.05);cursor:pointer;overflow:hidden"
+              >
+                @if (procesandoFoto()) {
+                  <div style="position:absolute;inset:0;display:grid;place-items:center;color:rgba(51,48,43,.6);font-size:12.5px">
+                    Procesando foto…
+                  </div>
+                } @else if (fotoPreview()) {
+                  <img [src]="fotoPreview()" alt="Vista previa" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover" />
+                } @else {
+                  <div style="position:absolute;inset:0;display:grid;place-items:center;text-align:center;color:rgba(51,48,43,.5)">
+                    <div>
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width:22px;height:22px;margin:0 auto">
+                        <path d="M14.5 4h-5L8 6H4.5A1.5 1.5 0 0 0 3 7.5v11A1.5 1.5 0 0 0 4.5 20h15a1.5 1.5 0 0 0 1.5-1.5v-11A1.5 1.5 0 0 0 19.5 6H16z"></path>
+                        <circle cx="12" cy="13" r="3.5"></circle>
+                      </svg>
+                      <div style="font-size:12.5px;margin-top:4px">Subir o sacar una foto</div>
+                    </div>
+                  </div>
+                }
+              </label>
+              <input id="foto" name="foto" type="file" accept="image/*,.heic,.heif" (change)="onFotoSeleccionada($event)" class="hidden" />
+            </div>
+
+            @if (error()) {
+              <p style="color:var(--danger);font-size:12.5px;margin:0">{{ error() }}</p>
+            }
+
+            <div class="flex gap-2.5">
+              <button type="button" class="soft-btn ghost" style="flex:none" (click)="cancelarReporte()" [disabled]="guardando()">Cancelar</button>
+              <button type="submit" class="soft-btn" style="flex:1" [disabled]="!usuario.trim() || guardando() || procesandoFoto()">
+                {{ guardando() ? 'Enviando...' : 'Enviar reporte' }}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  }
+</div>

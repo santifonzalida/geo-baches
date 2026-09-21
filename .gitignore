@@ -1,15 +1,24 @@
 # See https://docs.github.com/get-started/getting-started-with-git/ignoring-files for more about ignoring files.
+# Monorepo: una regla SIN "/" en el medio (dist/, node_modules/, .angular/) aplica en frontend/ y backend/;
+# con "/" en el medio (backend/.env) queda anclada a esa ruta.
 
 # Compiled output
-/dist
-/tmp
-/out-tsc
-/bazel-out
+dist/
+tmp/
+out-tsc/
+bazel-out/
+coverage/
 
 # Node
-/node_modules
+node_modules/
 npm-debug.log
 yarn-error.log
+
+# Backend (secretos y fotos subidas por usuarios: no van al repo)
+.env
+.env.*
+!.env.example
+backend/uploads/
 
 # IDEs and editors
 .idea/
@@ -30,13 +39,12 @@ yarn-error.log
 .history/*
 
 # Miscellaneous
-/.angular/cache
+.angular/
 .sass-cache/
-/connect.lock
-/coverage
-/libpeerconnection.log
+connect.lock
+libpeerconnection.log
 testem.log
-/typings
+typings/
 __screenshots__/
 
 # System files

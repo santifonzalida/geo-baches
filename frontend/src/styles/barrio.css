@@ -1,0 +1,146 @@
+/* Barrio — dirección "blanda": papel cálido, formas redondeadas, verde y terracota.
+   Adaptado de claude_design/Mapa de Pozos.dc.html (turn 2, opción 2a).
+   Fuentes Bricolage Grotesque / DM Sans cargadas desde index.html. */
+
+:root {
+  --ink: #33302b;
+  --cream: #faf6ef;
+  --paper: #fffdf9;
+  --line: rgba(51, 48, 43, 0.1);
+  --grass: #4f8a5b;
+  --clay: #c2683f;
+  --sun: #dda13c;
+  --danger: #a6402a;
+
+  --font-display: "Bricolage Grotesque", "DM Sans", system-ui, sans-serif;
+  --font-body: "DM Sans", system-ui, sans-serif;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-body);
+  color: var(--ink);
+  background: var(--cream);
+}
+
+h1, h2, h3, h4, .disp {
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin: 0;
+}
+
+.leaflet-container { background: var(--cream); font-family: var(--font-body); font-size: 11px; }
+.leaflet-control-attribution { font-size: 9px; background: rgba(250, 246, 239, 0.85); }
+
+.soft-card {
+  background: var(--paper);
+  border-radius: 22px;
+  box-shadow: 0 8px 28px rgba(51, 48, 43, 0.1);
+}
+
+.soft-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 15px;
+  border: 0;
+  border-radius: 999px;
+  font: 500 13px var(--font-body);
+  background: var(--paper);
+  color: var(--ink);
+  box-shadow: 0 2px 8px rgba(51, 48, 43, 0.08);
+  cursor: pointer;
+}
+.soft-chip.on { background: var(--grass); color: var(--paper); }
+
+.soft-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 0;
+  cursor: pointer;
+  font: 700 15px var(--font-body);
+  padding: 14px 22px;
+  border-radius: 999px;
+  background: var(--grass);
+  color: var(--paper);
+}
+.soft-btn:hover { background: #447a50; }
+.soft-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.soft-btn.ghost { background: rgba(51, 48, 43, 0.06); color: var(--ink); }
+.soft-btn.ghost:hover { background: rgba(51, 48, 43, 0.11); }
+.soft-btn.icon { width: 44px; height: 44px; padding: 0; border-radius: 50%; }
+
+.soft-in {
+  width: 100%;
+  border: 0;
+  background: rgba(51, 48, 43, 0.05);
+  border-radius: 14px;
+  padding: 13px 15px;
+  font: 15px var(--font-body);
+  color: var(--ink);
+}
+.soft-in::placeholder { color: rgba(51, 48, 43, 0.42); }
+.soft-in:focus-visible { outline: 2px solid var(--grass); outline-offset: 1px; }
+
+.soft-lab {
+  display: block;
+  font: 500 12.5px var(--font-body);
+  color: rgba(51, 48, 43, 0.55);
+  margin-bottom: 6px;
+}
+
+.sev {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 6px;
+  border: 0;
+  border-radius: 16px;
+  background: rgba(51, 48, 43, 0.05);
+  font: 500 13px var(--font-body);
+  color: var(--ink);
+  cursor: pointer;
+}
+.sev b { font-weight: 700; }
+
+.text-muted { color: rgba(51, 48, 43, 0.55); }
+
+/* Fila seleccionable en listas (panel de revisión). */
+.fila-seleccionable {
+  cursor: pointer;
+  transition: box-shadow 0.2s ease, transform 0.15s ease;
+}
+.fila-seleccionable:hover { transform: translateY(-1px); }
+.fila-seleccionable.activa { box-shadow: 0 0 0 2px var(--grass); }
+
+/* Marcador destacado con anillo pulsante — el punto que se está revisando en el mapa. */
+.marcador-pulso { position: relative; display: block; width: 34px; height: 34px; }
+.marcador-pulso-anillo {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: var(--color-marcador);
+  opacity: 0.4;
+  animation: pulso-mapa 1.6s ease-out infinite;
+}
+.marcador-pulso-punto {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--color-marcador);
+  border: 3px solid var(--paper);
+  box-shadow: 0 2px 6px rgba(51, 48, 43, 0.35);
+}
+@keyframes pulso-mapa {
+  0% { transform: scale(0.4); opacity: 0.45; }
+  100% { transform: scale(1); opacity: 0; }
+}
