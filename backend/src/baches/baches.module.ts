@@ -4,9 +4,10 @@ import { BachesController } from './baches.controller';
 import { BachesService } from './baches.service';
 import { FotosService } from './fotos.service';
 import { Bache } from './entities/bache.entity';
+import { StorageModule } from '../storage/storage.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Bache])],
+  imports: [TypeOrmModule.forFeature([Bache]), StorageModule],
   controllers: [BachesController],
   providers: [BachesService, FotosService],
 })

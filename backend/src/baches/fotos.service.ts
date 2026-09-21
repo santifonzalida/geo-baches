@@ -1,9 +1,7 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { randomUUID } from 'crypto';
-import { writeFile } from 'fs/promises';
-import { join } from 'path';
 import sharp from 'sharp';
-import { UPLOADS_DIR } from '../config/uploads';
+import { StorageService } from '../storage/storage.service';
 
 /** La foto solo se ve en ventanas chicas (popup, miniatura del panel): con esto sobra. */
 const LADO_MAX = 1280;
@@ -12,6 +10,8 @@ const CALIDAD_JPEG = 78;
 @Injectable()
 export class FotosService {
   private readonly logger = new Logger(FotosService.name);
+
+  constructor(private readonly storage: StorageService) {}
 
   /**
    * Guarda la foto ya procesada y devuelve su URL pública. Independiente de lo que
@@ -33,7 +33,7 @@ export class FotosService {
         : await base.flatten({ background: '#ffffff' }).jpeg({ quality: CALIDAD_JPEG, mozjpeg: true }).toBuffer();
 
       const nombre = `${randomUUID()}.${extension}`;
-      await writeFile(join(UPLOADS_DIR, nombre), procesada);
+      await this.storage.guardar(nombre, procesada, esGif ? 'image/gif' : 'image/jpeg');
       return `/uploads/${nombre}`;
     } catch (error) {
       this.logger.warn(`No se pudo procesar la foto: ${(error as Error).message}`);
