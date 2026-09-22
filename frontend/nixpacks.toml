@@ -1,9 +1,0 @@
-# Angular con el builder nuevo genera la salida en dist/<proyecto>/browser (no en dist/ directo).
-# La detección automática de Railway para Angular no siempre matchea esa ruta anidada, así que
-# se fija el build/start a mano: nada de adivinar.
-[phases.build]
-cmds = ["npm run build"]
-
-[start]
-# -s = modo SPA: cualquier ruta no encontrada cae a index.html (hace falta para /admin/pendientes).
-cmd = "npx serve -s dist/geo-baches-app/browser -l tcp://0.0.0.0:$PORT"
