@@ -114,16 +114,15 @@ export class AdminPendientesComponent implements OnInit, AfterViewInit, OnDestro
     return L.divIcon({ className: '', html, iconSize: [10, 10], iconAnchor: [5, 5] });
   }
 
-  /** Marcador grande con anillo pulsante — para que salte a la vista cuál es el punto en revisión. */
+  /** Ícono de criticidad con un anillo pulsante detrás: salta a la vista cuál es el punto en revisión. */
   private iconoDestacado(bache: Bache): L.DivIcon {
-    const color = this.colorSeveridad(bache);
     const html = `
-      <span class="marcador-pulso" style="--color-marcador:${color}">
+      <span class="marcador-pulso" style="--color-marcador:${this.colorSeveridad(bache)}">
         <span class="marcador-pulso-anillo"></span>
-        <span class="marcador-pulso-punto"></span>
+        <img class="marcador-pulso-icono" src="${this.iconoSeveridad(bache)}" alt="" draggable="false" />
       </span>
     `;
-    return L.divIcon({ className: '', html, iconSize: [34, 34], iconAnchor: [17, 17] });
+    return L.divIcon({ className: '', html, iconSize: [56, 56], iconAnchor: [28, 28] });
   }
 
   protected direccion(bache: Bache): string {
@@ -136,6 +135,10 @@ export class AdminPendientesComponent implements OnInit, AfterViewInit, OnDestro
 
   protected etiquetaSeveridad(bache: Bache): string {
     return this.severidades.find((s) => s.valor === bache.severidad)?.etiqueta ?? bache.severidad;
+  }
+
+  protected iconoSeveridad(bache: Bache): string {
+    return (this.severidades.find((s) => s.valor === bache.severidad) ?? this.severidades[1]).icono;
   }
 
   protected colorSeveridad(bache: Bache): string {

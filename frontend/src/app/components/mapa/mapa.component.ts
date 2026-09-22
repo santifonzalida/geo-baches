@@ -32,7 +32,6 @@ interface MarcadorRegistrado {
 const TAMANO_MAX_FOTO = 5 * 1024 * 1024;
 /** El servidor vuelve a procesarla (fotos.service.ts); acá se achica para no subir 12 MP por datos móviles. */
 const LADO_MAX_FOTO = 1280;
-const UNA_SEMANA_MS = 7 * 24 * 60 * 60 * 1000;
 
 @Component({
   selector: 'app-mapa',
@@ -62,21 +61,8 @@ export class MapaComponent implements AfterViewInit {
     [...this.baches()].sort((a, b) => b.fecha.getTime() - a.fecha.getTime()).slice(0, 4),
   );
 
-  /** Arreglados este mes / progreso — todo calculado de los datos ya cargados, sin pedirle nada más al backend. */
-  protected readonly stats = computed(() => {
-    const todos = this.baches();
-    const reparados = todos.filter((b) => b.estado === 'reparado').length;
-    const ahora = Date.now();
-    const estaSemana = todos.filter((b) => ahora - b.fecha.getTime() <= UNA_SEMANA_MS).length;
-    return {
-      reparados,
-      total: todos.length,
-      porcentaje: todos.length ? Math.round((reparados / todos.length) * 100) : 0,
-      estaSemana,
-    };
-  });
-
   protected readonly barraVisible = signal(true);
+  protected readonly listaReportesVisible = signal(true);
 
   protected readonly filtroEstado = signal<Record<EstadoBache, boolean>>({
     reportado: true,
@@ -139,10 +125,29 @@ export class MapaComponent implements AfterViewInit {
   }
 
   protected irAMiUbicacion(): void {
-    if (!navigator.geolocation) return;
-    navigator.geolocation.getCurrentPosition(({ coords }) => {
-      this.map.setView([coords.latitude, coords.longitude], 16);
-    });
+    if (!navigator.geolocation) {
+      this.avisarError('Tu navegador no permite obtener la ubicación.');
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      ({ coords }) => this.map.flyTo([coords.latitude, coords.longitude], 16, { duration: 0.6 }),
+      (fallo) =>
+        this.avisarError(
+          fallo.code === fallo.PERMISSION_DENIED
+            ? 'Para usar tu ubicación, permití el acceso desde el navegador.'
+            : 'No pudimos obtener tu ubicación. Intentá de nuevo.',
+        ),
+      { enableHighAccuracy: true, timeout: 10000 },
+    );
+  }
+
+  private avisarError(texto: string): void {
+    this.error.set(texto);
+    setTimeout(() => this.error() === texto && this.error.set(null), 5000);
+  }
+
+  protected toggleListaReportes(): void {
+    this.listaReportesVisible.update((valor) => !valor);
   }
 
   protected toggleBarra(): void {
@@ -173,6 +178,7 @@ export class MapaComponent implements AfterViewInit {
 
   /** Centra el mapa en un bache de la lista "Reportes de tu zona" y abre su popup. */
   protected irAlReporte(bache: Bache): void {
+    this.listaReportesVisible.set(false); // despeja el mapa para ver el punto y su popup
     this.map.flyTo([bache.lat, bache.lng], Math.max(this.map.getZoom(), 16), { duration: 0.6 });
     this.marcadores.get(bache.id)?.marker.openPopup();
   }
@@ -331,7 +337,9 @@ export class MapaComponent implements AfterViewInit {
 
   private agregarMarcador(bache: Bache): void {
     const marker = L.marker([bache.lat, bache.lng], { icon: this.crearIcono(bache) });
-    marker.bindPopup(this.popupHtml(bache));
+    // El autopan de Leaflet solo mueve lo justo para que entre el popup: se reemplaza por centrar el punto.
+    marker.bindPopup(this.popupHtml(bache), { autoPan: false });
+    marker.on('click', () => this.map.panTo(marker.getLatLng(), { animate: true, duration: 0.5 }));
     this.marcadores.set(bache.id, { marker, bache });
 
     const filtros = this.filtroEstado();
@@ -352,18 +360,38 @@ export class MapaComponent implements AfterViewInit {
     return this.severidades.find((s) => s.valor === severidad)?.etiqueta ?? severidad;
   }
 
+  protected iconoDeSeveridad(severidad: SeveridadBache): string {
+    return this.severidades.find((s) => s.valor === severidad)?.icono ?? this.severidades[1].icono;
+  }
+
   /**
-   * Marcadores "barrio": el relleno es la severidad, pero un bache reparado
-   * se pinta directamente de verde (el estado gana). En obra suma un
-   * contorno punteado — sin agregar colores nuevos al sistema.
+   * El ícono lo define la severidad (leve / moderado / crítico). El estado se lee en
+   * una insignia: "en obra" lleva una llave inglesa; "listo" se apaga y suma un tilde verde.
    */
   private crearIcono(bache: Bache): L.DivIcon {
-    const relleno = this.colorDeBache(bache);
-    const puntitos =
-      bache.estado === 'en-reparacion' ? ';outline:2px dotted rgba(255,253,249,.9);outline-offset:-7px' : '';
-    const html = `<span style="display:block;width:20px;height:20px;border-radius:50%;background:${relleno};border:3px solid #fffdf9;box-shadow:0 2px 6px rgba(51,48,43,.35)${puntitos}"></span>`;
+    const tamano = 40;
+    const resuelto = bache.estado === 'reparado';
+    const sombra = 'drop-shadow(0 2px 3px rgba(51,48,43,.4))';
+    const imagen = `<img src="${this.iconoDeSeveridad(bache.severidad)}" alt="" width="${tamano}" height="${tamano}" draggable="false" style="display:block;${resuelto ? `opacity:.6;filter:grayscale(.85) ${sombra}` : `filter:${sombra}`}" />`;
 
-    return L.divIcon({ className: '', html, iconSize: [20, 20], iconAnchor: [10, 10] });
+    const insignia = (fondo: string, trazo: string) =>
+      `<span style="position:absolute;right:-3px;bottom:0;width:17px;height:17px;border-radius:50%;background:${fondo};border:2px solid #fffdf9;display:grid;place-items:center"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#fffdf9" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" width="9" height="9">${trazo}</svg></span>`;
+    const llave = '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>';
+    const tilde = '<path d="M20 6 9 17l-5-5"/>';
+    const marca =
+      bache.estado === 'en-reparacion'
+        ? insignia('#33302b', llave)
+        : resuelto
+          ? insignia(COLOR_REPARADO, tilde)
+          : '';
+
+    return L.divIcon({
+      className: '',
+      html: `<span style="position:relative;display:block;width:${tamano}px;height:${tamano}px">${imagen}${marca}</span>`,
+      iconSize: [tamano, tamano],
+      iconAnchor: [tamano / 2, tamano / 2],
+      popupAnchor: [0, -tamano / 2], // el popup apunta al borde superior del ícono, no a su centro
+    });
   }
 
   protected tiempoRelativo(fecha: Date): string {

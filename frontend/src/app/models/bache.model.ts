@@ -65,8 +65,9 @@ export const ESTADOS_BACHE: { valor: EstadoBache; etiqueta: string }[] = [
   { valor: 'reparado', etiqueta: 'Listo' },
 ];
 
-export const SEVERIDADES_BACHE: { valor: SeveridadBache; etiqueta: string; color: string }[] = [
-  { valor: 'baja', etiqueta: 'Molesta', color: '#dda13c' },
-  { valor: 'media', etiqueta: 'Rompe autos', color: '#c2683f' },
-  { valor: 'alta', etiqueta: 'Peligrosa', color: '#a6402a' },
+/** `icono`: triángulo de advertencia (public/assets/icons) que marca el punto en el mapa según la criticidad. */
+export const SEVERIDADES_BACHE: { valor: SeveridadBache; etiqueta: string; color: string; icono: string }[] = [
+  { valor: 'baja', etiqueta: 'Molesta', color: '#dda13c', icono: 'assets/icons/leve.svg' },
+  { valor: 'media', etiqueta: 'Rompe autos', color: '#c2683f', icono: 'assets/icons/moderado.svg' },
+  { valor: 'alta', etiqueta: 'Peligrosa', color: '#a6402a', icono: 'assets/icons/critico.svg' },
 ];
