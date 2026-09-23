@@ -23,8 +23,8 @@ describe('App', () => {
     expect(harness.routeNativeElement?.tagName.toLowerCase()).toBe('app-mapa');
   });
 
-  it('should render the admin panel at /admin/pendientes', async () => {
+  it('should redirect to login when visiting /admin/pendientes without a session', async () => {
     const harness = await RouterTestingHarness.create('/admin/pendientes');
-    expect(harness.routeNativeElement?.tagName.toLowerCase()).toBe('app-admin-pendientes');
+    expect(harness.routeNativeElement?.tagName.toLowerCase()).toBe('app-login');
   });
 });

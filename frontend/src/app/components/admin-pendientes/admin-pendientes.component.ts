@@ -5,8 +5,7 @@
 // un mapa que centra el punto seleccionado, con los baches ya aprobados como
 // referencia de fondo (para detectar duplicados/contexto geográfico).
 //
-// Sin login por ahora. Cuando se agregue autenticación, este es el componente
-// a poner detrás de un canActivate en app.routes.ts (ver comentario ahí).
+// Detrás de authGuard en app.routes.ts: sin sesión válida, redirige a /admin/login.
 import {
   AfterViewInit,
   Component,
@@ -17,8 +16,9 @@ import {
   inject,
   signal,
 } from '@angular/core';
-import { RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import * as L from 'leaflet';
+import { AuthService } from '../../services/auth.service';
 import { BachesService } from '../../services/baches.service';
 import { Bache, formatearDireccion, SEVERIDADES_BACHE } from '../../models/bache.model';
 
@@ -32,6 +32,8 @@ export class AdminPendientesComponent implements OnInit, AfterViewInit, OnDestro
   @ViewChild('mapContainer') mapContainer!: ElementRef;
 
   private readonly bachesService = inject(BachesService);
+  private readonly auth = inject(AuthService);
+  private readonly router = inject(Router);
   private map!: L.Map;
   private marcadorSeleccionado: L.Marker | undefined;
 
@@ -44,6 +46,11 @@ export class AdminPendientesComponent implements OnInit, AfterViewInit, OnDestro
 
   ngOnInit(): void {
     this.cargar();
+  }
+
+  protected cerrarSesion(): void {
+    this.auth.logout();
+    this.router.navigateByUrl('/admin/login');
   }
 
   ngAfterViewInit(): void {

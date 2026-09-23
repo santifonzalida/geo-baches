@@ -1,0 +1,35 @@
+<div class="min-h-screen flex items-center justify-center px-4" style="background:var(--cream)">
+  <div class="soft-card flex flex-col gap-4" style="width:min(360px,100%);padding:28px">
+    <div class="flex items-center gap-2.5">
+      <span style="width:30px;height:30px;border-radius:50%;background:var(--grass);display:grid;place-items:center;flex:none">
+        <span style="width:10px;height:10px;border-radius:50%;background:var(--paper)"></span>
+      </span>
+      <div>
+        <div class="disp" style="font-size:20px">Panel de revisión</div>
+        <div class="text-muted" style="font-size:12.5px">Acceso para administradores</div>
+      </div>
+    </div>
+
+    <form (ngSubmit)="ingresar()" class="flex flex-col gap-4">
+      <div>
+        <label class="soft-lab" for="usuario">Usuario</label>
+        <input id="usuario" name="usuario" class="soft-in" type="text" [(ngModel)]="usuario" required autocomplete="username" />
+      </div>
+
+      <div>
+        <label class="soft-lab" for="password">Contraseña</label>
+        <input id="password" name="password" class="soft-in" type="password" [(ngModel)]="password" required autocomplete="current-password" />
+      </div>
+
+      @if (error()) {
+        <p style="color:var(--danger);font-size:12.5px;margin:0">{{ error() }}</p>
+      }
+
+      <button type="submit" class="soft-btn" style="width:100%" [disabled]="!usuario.trim() || !password || enviando()">
+        {{ enviando() ? 'Ingresando...' : 'Ingresar' }}
+      </button>
+
+      <a routerLink="/" class="text-muted" style="font-size:12.5px;text-align:center;text-decoration:none">← Volver al mapa</a>
+    </form>
+  </div>
+</div>
