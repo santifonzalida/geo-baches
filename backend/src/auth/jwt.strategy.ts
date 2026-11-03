@@ -2,10 +2,11 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
+import { NombreRol } from '../usuarios/entities/rol.entity';
 
 export interface JwtPayload {
   sub: string;
-  role: 'admin';
+  role: NombreRol;
 }
 
 @Injectable()

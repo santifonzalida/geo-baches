@@ -15,6 +15,8 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { Roles } from '../auth/roles.decorator';
+import { RolesGuard } from '../auth/roles.guard';
 import { BachesService } from './baches.service';
 import { FotosService } from './fotos.service';
 import { CreateBacheDto } from './dto/create-bache.dto';
@@ -36,7 +38,8 @@ export class BachesController {
   }
 
   @Get('pendientes')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
   findPendientes(): Promise<Bache[]> {
     return this.bachesService.findPendientes();
   }
@@ -70,13 +73,15 @@ export class BachesController {
   }
 
   @Patch(':id/aprobar')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
   aprobar(@Param('id', ParseUUIDPipe) id: string): Promise<Bache> {
     return this.bachesService.aprobar(id);
   }
 
   @Patch(':id/estado')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
   updateEstado(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateEstadoDto,
@@ -85,7 +90,8 @@ export class BachesController {
   }
 
   @Delete(':id')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
   remove(@Param('id', ParseUUIDPipe) id: string): Promise<void> {
     return this.bachesService.remove(id);
   }

@@ -39,7 +39,8 @@ export class UsuariosSeedService implements OnModuleInit {
   }
 
   private async asegurarAdmin(rolAdmin: Rol): Promise<void> {
-    const usuario = this.config.get<string>('ADMIN_USER');
+    // En minúsculas, igual que lo normaliza el login.
+    const usuario = this.config.get<string>('ADMIN_USER')?.trim().toLowerCase();
     const passwordHash = this.config.get<string>('ADMIN_PASSWORD_HASH');
     if (!usuario || !passwordHash) {
       this.logger.warn('ADMIN_USER/ADMIN_PASSWORD_HASH no configuradas: no se siembra ningún admin');
