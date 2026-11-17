@@ -1,97 +1,214 @@
 // mapa.component.ts
+//
+// Pantalla principal (docs/design/geobaches-diseno/01-mapa-lista): mapa Leaflet con
+// los baches aprobados, barra de búsqueda/filtros, panel "Reportes recientes" y el
+// botón "Reportar bache". Se traen todos los aprobados y se filtran en pantalla.
+//
+// Reportar (docs/design/geobaches-diseno/03-reportar): solo desde el botón. Un pin fijo
+// queda en el centro de lo que el formulario no tapa y la persona mueve el mapa hasta el
+// bache; tocar el mapa lleva ese punto bajo el pin. La dirección se sugiere al soltar.
 import {
+  AfterViewInit,
   Component,
   ElementRef,
-  AfterViewInit,
+  OnDestroy,
   ViewChild,
-  signal,
   computed,
+  effect,
   inject,
+  signal,
+  untracked,
 } from '@angular/core';
 import { HttpErrorResponse } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
 import { DecimalPipe } from '@angular/common';
+import { Router, RouterOutlet } from '@angular/router';
 import * as L from 'leaflet';
+import { BacheSeleccionadoService } from '../../services/bache-seleccionado.service';
 import { BachesService } from '../../services/baches.service';
 import {
   Bache,
   COLOR_REPARADO,
-  formatearDireccion,
-  EstadoBache,
+  cumpleFiltros,
   ESTADOS_BACHE,
+  EstadoBache,
+  formatearDireccion,
+  nivelDe,
   SeveridadBache,
   SEVERIDADES_BACHE,
 } from '../../models/bache.model';
-
-interface MarcadorRegistrado {
-  marker: L.Marker;
-  bache: Bache;
-}
+import { BarraMapaComponent } from '../barra-mapa/barra-mapa.component';
+import { HojaReportesComponent } from '../hoja-reportes/hoja-reportes.component';
 
 /** Debe coincidir con el límite del backend (baches.controller.ts). */
 const TAMANO_MAX_FOTO = 5 * 1024 * 1024;
 /** El servidor vuelve a procesarla (fotos.service.ts); acá se achica para no subir 12 MP por datos móviles. */
 const LADO_MAX_FOTO = 1280;
 
+/** Alturas del panel "Reportes recientes" (abierto / plegado), como en el diseño. */
+const ALTURA_HOJA_ABIERTA = 290;
+const ALTURA_HOJA_CERRADA = 88;
+/** Alto del panel de detalle en celular y ancho de las columnas en pantallas anchas (ver los templates). */
+const ALTURA_DETALLE = 493;
+const ANCHO_COLUMNA = 400 + 12;
+/** Desde este ancho (md de Tailwind) los paneles van en una columna a la izquierda. */
+const ANCHO_ESCRITORIO = 768;
+/** Formulario de reporte en celular: abierto (sin pasar de alto - margen) y plegado, como en el diseño. */
+const ALTURA_FORM_ABIERTO = 580;
+const ALTURA_FORM_CERRADO = 190;
+const MAPA_MINIMO_CON_FORM = 180;
+/** La punta del pin está 46 px por debajo de su borde superior (ver template). */
+const ALTO_PIN = 46;
+/** Se espera a que el mapa quede quieto antes de pedir la dirección (Nominatim pide ≤ 1 req/s). */
+const ESPERA_GEOCODIFICAR = 700;
+/** Con menos zoom que esto el punto es demasiado impreciso: se pide acercar. */
+const ZOOM_PRECISO = 15;
+const CLAVE_USUARIO = 'geobaches-usuario';
+
 @Component({
   selector: 'app-mapa',
   standalone: true,
-  imports: [FormsModule, DecimalPipe],
+  imports: [FormsModule, DecimalPipe, RouterOutlet, BarraMapaComponent, HojaReportesComponent],
   templateUrl: './mapa.component.html',
+  host: { '(window:resize)': 'medir()' },
 })
-export class MapaComponent implements AfterViewInit {
+export class MapaComponent implements AfterViewInit, OnDestroy {
   @ViewChild('mapContainer') mapContainer!: ElementRef;
 
   private readonly bachesService = inject(BachesService);
+  private readonly router = inject(Router);
+  private readonly seleccionado = inject(BacheSeleccionadoService);
   private map!: L.Map;
-  private readonly marcadores = new Map<string, MarcadorRegistrado>();
+  private readonly marcadores = new Map<string, L.Marker>();
+  private marcadorUbicacion: L.Marker | undefined;
+  /** Id del marcador que hoy tiene el ícono destacado. */
+  private destacadoId: string | null = null;
+  /** Dónde estaba el pin la última vez: si se mueve (se pliega el formulario), el mapa lo acompaña. */
+  private pinAnterior: L.Point | null = null;
+  private temporizadorGeocodificar: ReturnType<typeof setTimeout> | undefined;
 
-  protected readonly estados = ESTADOS_BACHE;
+  /** Tamaño del contenedor del mapa (la pantalla). */
+  private readonly tamano = signal({ ancho: window.innerWidth, alto: window.innerHeight });
+  private readonly esEscritorio = computed(() => this.tamano().ancho >= ANCHO_ESCRITORIO);
+  protected readonly zoom = signal(13);
+  /** El mapa se está moviendo: el pin se levanta un poco. */
+  protected readonly moviendo = signal(false);
+
   protected readonly severidades = SEVERIDADES_BACHE;
   protected readonly baches = this.bachesService.baches;
 
-  protected readonly conteoPorEstado = computed(() => {
-    const conteo: Record<EstadoBache, number> = { reportado: 0, 'en-reparacion': 0, reparado: 0 };
-    this.baches().forEach((bache) => conteo[bache.estado]++);
-    return conteo;
+  // Filtros de la barra
+  protected readonly filtroEstado = signal<EstadoBache>('reportado');
+  protected readonly nivelSeleccionado = signal<SeveridadBache | null>(null);
+  protected readonly busqueda = signal('');
+
+  protected readonly hojaAbierta = signal(true);
+  /** Hay un detalle abierto (/bache/:id): se esconden la barra, la lista y los botones flotantes. */
+  protected readonly detalleAbierto = computed(() => this.seleccionado.id() !== null);
+  /** Lo que se ve del mapa; null hasta que el mapa existe. */
+  private readonly limites = signal<L.LatLngBounds | null>(null);
+
+  protected readonly visibles = computed(() => {
+    const filtros = { estado: this.filtroEstado(), nivel: this.nivelSeleccionado(), busqueda: this.busqueda() };
+    return this.baches().filter((bache) => cumpleFiltros(bache, filtros));
   });
 
-  /** Últimos reportes, más nuevo primero — para la lista "Reportes de tu zona". */
-  protected readonly ultimosReportes = computed(() =>
-    [...this.baches()].sort((a, b) => b.fecha.getTime() - a.fecha.getTime()).slice(0, 4),
-  );
-
-  protected readonly barraVisible = signal(true);
-  protected readonly listaReportesVisible = signal(true);
-
-  protected readonly filtroEstado = signal<Record<EstadoBache, boolean>>({
-    reportado: true,
-    'en-reparacion': true,
-    reparado: true,
+  /** Los visibles dentro de la zona del mapa, más nuevo primero: la lista del panel. */
+  protected readonly enZona = computed(() => {
+    const limites = this.limites();
+    return this.visibles()
+      .filter((bache) => !limites || limites.contains([bache.lat, bache.lng]))
+      .sort((a, b) => b.fecha.getTime() - a.fecha.getTime());
   });
-  protected readonly soloAlta = signal(false);
 
-  protected readonly clickLatLng = signal<L.LatLng | null>(null);
-  protected readonly formVisible = signal(false);
+  protected readonly subtituloHoja = computed(() => {
+    const estado = ESTADOS_BACHE.find((e) => e.valor === this.filtroEstado());
+    return `${this.enZona().length} ${estado?.filtro.toLowerCase()} en esta zona`;
+  });
+
+  // Reporte
+  protected readonly reportando = signal(false);
+  protected readonly nivelReporte = signal<SeveridadBache>('media');
+  /** El punto bajo el pin: el que se va a reportar. */
+  protected readonly punto = signal<L.LatLng | null>(null);
+  /** Formulario abierto o plegado (solo en celular; en pantallas anchas es una columna). */
+  protected readonly formularioAbierto = signal(true);
+  protected readonly editandoDireccion = signal(false);
   protected readonly fotoPreview = signal<string | null>(null);
   protected readonly guardando = signal(false);
-  protected readonly error = signal<string | null>(null);
-  protected readonly mensajeExito = signal<string | null>(null);
-  private temporizadorExito: ReturnType<typeof setTimeout> | undefined;
-
   protected readonly buscandoDireccion = signal(false);
   protected readonly procesandoFoto = signal(false);
+
+  protected readonly error = signal<string | null>(null);
+  protected readonly aviso = signal<string | null>(null);
+  private temporizadorAviso: ReturnType<typeof setTimeout> | undefined;
+
+  /** Alto que ocupa el panel inferior: los botones flotantes se acomodan arriba de él. */
+  protected readonly alturaHoja = computed(() =>
+    this.reportando() ? 0 : this.hojaAbierta() ? ALTURA_HOJA_ABIERTA : ALTURA_HOJA_CERRADA,
+  );
+
+  protected readonly alturaFormulario = computed(() =>
+    this.formularioAbierto()
+      ? Math.min(ALTURA_FORM_ABIERTO, this.tamano().alto - MAPA_MINIMO_CON_FORM)
+      : ALTURA_FORM_CERRADO,
+  );
+
+  /** Punta del pin, en px del mapa: centrada en lo que el formulario no tapa (corrida para que el pin entero quede al medio). */
+  protected readonly posicionPin = computed(() => {
+    const { ancho, alto } = this.tamano();
+    return this.esEscritorio()
+      ? L.point(ANCHO_COLUMNA + (ancho - ANCHO_COLUMNA) / 2, alto / 2 + ALTO_PIN / 2)
+      : L.point(ancho / 2, (alto - this.alturaFormulario()) / 2 + ALTO_PIN / 2);
+  });
+
+  /** El cartel va arriba del pin, sin pegarse al borde. */
+  protected readonly topAyuda = computed(() => Math.max(14, this.posicionPin().y - ALTO_PIN - 54));
+  protected readonly textoAyuda = computed(() =>
+    this.zoom() < ZOOM_PRECISO ? 'Acercá el mapa hasta el bache' : 'Mové el mapa hasta el bache',
+  );
 
   protected usuario = '';
   protected calle = '';
   protected altura = '';
   protected barrio = '';
-  protected severidad: SeveridadBache = 'media';
   private fotoSeleccionada: File | undefined;
+
+  constructor() {
+    // Los marcadores siguen a los filtros: se agregan o quitan del mapa, no se recrean.
+    effect(() => this.sincronizarMarcadores(this.visibles()));
+    // Al abrir/cerrar un detalle: destacar ese punto, atenuar el resto y centrarlo.
+    effect(() => {
+      const id = this.seleccionado.id();
+      const bache = this.baches().find((b) => b.id === id) ?? null;
+      untracked(() => this.destacar(bache));
+    });
+    // Si el pin cambia de lugar (se pliega el formulario, gira la pantalla), el mapa se corre igual: el punto no cambia.
+    effect(() => {
+      const pin = this.posicionPin();
+      untracked(() => this.acompanarPin(pin));
+    });
+  }
 
   ngAfterViewInit(): void {
     this.initMap();
     this.cargarBachesExistentes();
+
+    this.medir();
+  }
+
+  ngOnDestroy(): void {
+    clearTimeout(this.temporizadorAviso);
+    clearTimeout(this.temporizadorGeocodificar);
+    this.map?.remove();
+  }
+
+  /** El mapa ocupa toda la pantalla: alcanza con volver a medir cuando cambia la ventana. */
+  protected medir(): void {
+    const contenedor: HTMLElement = this.mapContainer.nativeElement;
+    if (contenedor.clientWidth && contenedor.clientHeight) {
+      this.tamano.set({ ancho: contenedor.clientWidth, alto: contenedor.clientHeight });
+    }
   }
 
   private initMap(): void {
@@ -106,22 +223,44 @@ export class MapaComponent implements AfterViewInit {
       maxZoom: 19,
     }).addTo(this.map);
 
-    this.map.on('click', (e: L.LeafletMouseEvent) => this.onMapClick(e.latlng));
+    this.limites.set(this.map.getBounds());
+    this.zoom.set(this.map.getZoom());
+    this.map.on('movestart', () => this.moviendo.set(true));
+    this.map.on('moveend', () => {
+      this.moviendo.set(false);
+      this.limites.set(this.map.getBounds());
+      this.zoom.set(this.map.getZoom());
+      if (this.reportando()) this.actualizarPunto();
+    });
+    // Reportando, tocar el mapa lleva ese lugar bajo el pin (y acerca, si está muy lejos para marcar el punto).
+    this.map.on('click', (e: L.LeafletMouseEvent) => {
+      if (this.reportando()) {
+        this.centrarEn(e.latlng, Math.max(this.map.getZoom(), ZOOM_PRECISO + 2), this.posicionPin());
+      }
+    });
   }
 
   private cargarBachesExistentes(): void {
     this.bachesService.cargar().subscribe({
-      next: (baches) => baches.forEach((bache) => this.agregarMarcador(bache)),
+      next: (baches) => {
+        baches.forEach((bache) => this.registrarMarcador(bache));
+        this.sincronizarMarcadores(this.visibles());
+      },
       error: () => this.error.set('No se pudieron cargar los baches. ¿Está corriendo el backend?'),
     });
   }
 
-  protected zoomIn(): void {
-    this.map.zoomIn();
-  }
-
-  protected zoomOut(): void {
-    this.map.zoomOut();
+  private sincronizarMarcadores(visibles: Bache[]): void {
+    if (!this.map) return;
+    const ids = new Set(visibles.map((bache) => bache.id));
+    // El bache del detalle se ve aunque los filtros lo escondan (ej. un link compartido a uno arreglado).
+    const seleccionado = this.seleccionado.id();
+    if (seleccionado) ids.add(seleccionado);
+    this.marcadores.forEach((marker, id) => {
+      const enMapa = this.map.hasLayer(marker);
+      if (ids.has(id) && !enMapa) marker.addTo(this.map);
+      if (!ids.has(id) && enMapa) this.map.removeLayer(marker);
+    });
   }
 
   protected irAMiUbicacion(): void {
@@ -130,7 +269,13 @@ export class MapaComponent implements AfterViewInit {
       return;
     }
     navigator.geolocation.getCurrentPosition(
-      ({ coords }) => this.map.flyTo([coords.latitude, coords.longitude], 16, { duration: 0.6 }),
+      ({ coords }) => {
+        const punto = L.latLng(coords.latitude, coords.longitude);
+        this.marcadorUbicacion?.remove();
+        this.marcadorUbicacion = L.marker(punto, { icon: this.iconoUbicacion(), interactive: false }).addTo(this.map);
+        if (this.reportando()) this.centrarEn(punto, 17, this.posicionPin());
+        else this.map.flyTo(punto, 16, { duration: 0.6 });
+      },
       (fallo) =>
         this.avisarError(
           fallo.code === fallo.PERMISSION_DENIED
@@ -141,75 +286,134 @@ export class MapaComponent implements AfterViewInit {
     );
   }
 
+  protected mostrarAcercaDe(): void {
+    // Pendiente: pantalla con información del sitio.
+    this.mostrarAviso('Muy pronto vas a encontrar acá información sobre GeoBaches.');
+  }
+
   private avisarError(texto: string): void {
     this.error.set(texto);
     setTimeout(() => this.error() === texto && this.error.set(null), 5000);
   }
 
-  protected toggleListaReportes(): void {
-    this.listaReportesVisible.update((valor) => !valor);
-  }
-
-  protected toggleBarra(): void {
-    this.barraVisible.update((valor) => !valor);
-  }
-
-  protected toggleFiltroEstado(valor: EstadoBache): void {
-    this.filtroEstado.update((actual) => ({ ...actual, [valor]: !actual[valor] }));
-    this.aplicarFiltros();
-  }
-
-  protected toggleSoloAlta(): void {
-    this.soloAlta.update((valor) => !valor);
-    this.aplicarFiltros();
-  }
-
-  private aplicarFiltros(): void {
-    const filtros = this.filtroEstado();
-    const alta = this.soloAlta();
-
-    this.marcadores.forEach(({ marker, bache }) => {
-      const visible = filtros[bache.estado] && (!alta || bache.severidad === 'alta');
-      const yaEstaEnMapa = this.map.hasLayer(marker);
-      if (visible && !yaEstaEnMapa) marker.addTo(this.map);
-      if (!visible && yaEstaEnMapa) this.map.removeLayer(marker);
-    });
-  }
-
-  /** Centra el mapa en un bache de la lista "Reportes de tu zona" y abre su popup. */
   protected irAlReporte(bache: Bache): void {
-    this.listaReportesVisible.set(false); // despeja el mapa para ver el punto y su popup
-    this.map.flyTo([bache.lat, bache.lng], Math.max(this.map.getZoom(), 16), { duration: 0.6 });
-    this.marcadores.get(bache.id)?.marker.openPopup();
+    this.router.navigate(['/bache', bache.id]);
   }
 
-  private onMapClick(latlng: L.LatLng): void {
-    this.clickLatLng.set(latlng);
-    this.usuario = '';
+  /** Destaca el bache del detalle (o deja todo normal con null) y lo centra en la parte visible del mapa. */
+  private destacar(bache: Bache | null): void {
+    if (!this.map) return;
+
+    if (this.destacadoId && this.destacadoId !== bache?.id) {
+      const anterior = this.baches().find((b) => b.id === this.destacadoId);
+      const marker = this.marcadores.get(this.destacadoId);
+      if (anterior && marker) marker.setIcon(this.crearIcono(anterior)).setZIndexOffset(0);
+    }
+    this.destacadoId = bache?.id ?? null;
+
+    this.marcadores.forEach((marker, id) => marker.setOpacity(!bache || id === bache.id ? 1 : 0.45));
+    this.sincronizarMarcadores(this.visibles());
+    if (!bache) return;
+
+    this.marcadores.get(bache.id)?.setIcon(this.crearIcono(bache, true)).setZIndexOffset(1000);
+    // En el centro de lo que el panel de detalle no tapa.
+    const { ancho, alto } = this.tamano();
+    const destino = this.esEscritorio()
+      ? L.point(ANCHO_COLUMNA + (ancho - ANCHO_COLUMNA) / 2, alto / 2)
+      : L.point(ancho / 2, (alto - ALTURA_DETALLE) / 2);
+    this.centrarEn(L.latLng(bache.lat, bache.lng), Math.max(this.map.getZoom(), 16), destino);
+  }
+
+  /** flyTo, pero dejando `punto` en el lugar `destino` (px del contenedor) en vez de en el centro. */
+  private centrarEn(punto: L.LatLng, zoom: number, destino: L.Point): void {
+    const desplazamiento = this.map.getSize().divideBy(2).subtract(destino);
+    const centro = this.map.unproject(this.map.project(punto, zoom).add(desplazamiento), zoom);
+    this.map.flyTo(centro, zoom, { duration: 0.6 });
+  }
+
+  // --- Reporte -------------------------------------------------------------
+
+  protected abrirReporte(): void {
+    this.usuario = this.leerUsuarioGuardado();
     this.calle = '';
     this.altura = '';
     this.barrio = '';
-    this.severidad = 'media';
+    this.nivelReporte.set('media');
     this.fotoSeleccionada = undefined;
     this.fotoPreview.set(null);
+    this.punto.set(null);
     this.error.set(null);
-    this.formVisible.set(true);
-    this.autocompletarDireccion(latlng);
+    this.editandoDireccion.set(false);
+    this.formularioAbierto.set(true);
+    this.reportando.set(true);
+    // El pin aparece donde corresponde a este estado del formulario: no hay que correr el mapa por eso.
+    this.pinAnterior = this.posicionPin();
+
+    // Si ya sabemos dónde está la persona, arrancamos ahí; si no, en lo que hoy esté bajo el pin.
+    const ubicacion = this.marcadorUbicacion?.getLatLng();
+    if (ubicacion) this.centrarEn(ubicacion, Math.max(this.map.getZoom(), 17), this.pinAnterior);
+    else this.actualizarPunto();
+  }
+
+  protected alternarFormulario(): void {
+    this.formularioAbierto.update((abierto) => !abierto);
+  }
+
+  /** Mueve el mapa lo mismo que se movió el pin, para que siga apuntando al mismo lugar. */
+  private acompanarPin(pin: L.Point): void {
+    const anterior = this.pinAnterior;
+    this.pinAnterior = pin;
+    if (!this.map || !this.reportando() || !anterior) return;
+    const delta = anterior.subtract(pin);
+    if (delta.x || delta.y) this.map.panBy(delta, { duration: 0.25 });
+  }
+
+  /** Toma el lugar bajo el pin como punto del reporte y, cuando el mapa queda quieto, sugiere la dirección. */
+  private actualizarPunto(): void {
+    const latlng = this.map.containerPointToLatLng(this.posicionPin());
+    const anterior = this.punto();
+    if (anterior && anterior.distanceTo(latlng) < 2) return; // solo se reacomodó el pin
+
+    this.punto.set(latlng);
+    this.calle = '';
+    this.altura = '';
+    this.barrio = '';
+    this.buscandoDireccion.set(true);
+    clearTimeout(this.temporizadorGeocodificar);
+    this.temporizadorGeocodificar = setTimeout(() => this.autocompletarDireccion(latlng), ESPERA_GEOCODIFICAR);
   }
 
   /** Sugiere calle/altura/barrio; si la persona ya escribió algo en un campo, no se lo pisa. */
   private autocompletarDireccion(latlng: L.LatLng): void {
-    this.buscandoDireccion.set(true);
     this.bachesService.geocodificar(latlng.lat, latlng.lng).subscribe({
       next: (direccion) => {
-        if (this.clickLatLng() !== latlng) return; // el formulario ya apunta a otro punto
+        if (this.punto() !== latlng) return; // el pin ya apunta a otro lugar
         this.calle ||= direccion.calle ?? '';
         this.altura ||= direccion.altura ?? '';
         this.barrio ||= direccion.barrio ?? '';
         this.buscandoDireccion.set(false);
       },
-      error: () => this.buscandoDireccion.set(false),
+      error: () => {
+        if (this.punto() === latlng) this.buscandoDireccion.set(false);
+      },
     });
+  }
+
+  /** El nombre se recuerda en este navegador para no tener que escribirlo en cada reporte. */
+  private leerUsuarioGuardado(): string {
+    try {
+      return localStorage.getItem(CLAVE_USUARIO) ?? '';
+    } catch {
+      return '';
+    }
+  }
+
+  private guardarUsuario(usuario: string): void {
+    try {
+      localStorage.setItem(CLAVE_USUARIO, usuario);
+    } catch {
+      // sin almacenamiento (modo privado): se vuelve a pedir la próxima vez
+    }
   }
 
   protected async onFotoSeleccionada(event: Event): Promise<void> {
@@ -280,7 +484,7 @@ export class MapaComponent implements AfterViewInit {
   }
 
   protected guardarBache(): void {
-    const latlng = this.clickLatLng();
+    const latlng = this.punto();
     if (!latlng || !this.usuario.trim()) return;
 
     this.guardando.set(true);
@@ -292,7 +496,7 @@ export class MapaComponent implements AfterViewInit {
         lng: latlng.lng,
         // Un reporte vecinal siempre arranca "sin reparar"; el avance de obra lo mueve otro flujo (inspector).
         estado: 'reportado',
-        severidad: this.severidad,
+        severidad: this.nivelReporte(),
         usuario: this.usuario.trim(),
         calle: this.calle.trim(),
         altura: this.altura.trim(),
@@ -302,8 +506,9 @@ export class MapaComponent implements AfterViewInit {
       .subscribe({
         next: () => {
           this.guardando.set(false);
+          this.guardarUsuario(this.usuario.trim());
           this.cancelarReporte();
-          this.mostrarMensajeExito('¡Gracias! Tu reporte se envió y se va a mostrar en el mapa cuando sea revisado.');
+          this.mostrarAviso('¡Gracias! Tu reporte se envió y se va a mostrar en el mapa cuando sea revisado.');
         },
         error: (e: HttpErrorResponse) => {
           this.guardando.set(false);
@@ -319,123 +524,74 @@ export class MapaComponent implements AfterViewInit {
       });
   }
 
-  private mostrarMensajeExito(texto: string): void {
-    this.mensajeExito.set(texto);
-    clearTimeout(this.temporizadorExito);
-    this.temporizadorExito = setTimeout(() => this.mensajeExito.set(null), 5000);
+  private mostrarAviso(texto: string): void {
+    this.aviso.set(texto);
+    clearTimeout(this.temporizadorAviso);
+    this.temporizadorAviso = setTimeout(() => this.aviso.set(null), 5000);
   }
 
   protected cancelarReporte(): void {
     const preview = this.fotoPreview();
     if (preview) URL.revokeObjectURL(preview);
 
-    this.formVisible.set(false);
-    this.clickLatLng.set(null);
+    clearTimeout(this.temporizadorGeocodificar);
+    this.reportando.set(false);
+    this.punto.set(null);
     this.fotoPreview.set(null);
     this.buscandoDireccion.set(false);
   }
 
-  private agregarMarcador(bache: Bache): void {
-    const marker = L.marker([bache.lat, bache.lng], { icon: this.crearIcono(bache) });
-    // El autopan de Leaflet solo mueve lo justo para que entre el popup: se reemplaza por centrar el punto.
-    marker.bindPopup(this.popupHtml(bache), { autoPan: false });
-    marker.on('click', () => this.map.panTo(marker.getLatLng(), { animate: true, duration: 0.5 }));
-    this.marcadores.set(bache.id, { marker, bache });
+  // --- Marcadores ----------------------------------------------------------
 
-    const filtros = this.filtroEstado();
-    const visible = filtros[bache.estado] && (!this.soloAlta() || bache.severidad === 'alta');
-    if (visible) marker.addTo(this.map);
-  }
-
-  protected colorDeBache(bache: Pick<Bache, 'estado' | 'severidad'>): string {
-    if (bache.estado === 'reparado') return COLOR_REPARADO;
-    return this.severidades.find((s) => s.valor === bache.severidad)?.color ?? '#c2683f';
-  }
-
-  protected direccion(bache: Bache): string {
-    return formatearDireccion(bache);
-  }
-
-  protected etiquetaSeveridad(severidad: SeveridadBache): string {
-    return this.severidades.find((s) => s.valor === severidad)?.etiqueta ?? severidad;
-  }
-
-  protected iconoDeSeveridad(severidad: SeveridadBache): string {
-    return this.severidades.find((s) => s.valor === severidad)?.icono ?? this.severidades[1].icono;
+  /** Crea el marcador (tocarlo abre el detalle); lo agrega al mapa sincronizarMarcadores según los filtros. */
+  private registrarMarcador(bache: Bache): void {
+    const marker = L.marker([bache.lat, bache.lng], {
+      icon: this.crearIcono(bache),
+      title: `${nivelDe(bache.severidad).etiqueta} en ${formatearDireccion(bache)}`,
+    });
+    marker.on('click', () => {
+      if (!this.reportando()) this.irAlReporte(bache);
+    });
+    this.marcadores.set(bache.id, marker);
   }
 
   /**
-   * El ícono lo define la severidad (leve / moderado / crítico). El estado se lee en
-   * una insignia: "en obra" lleva una llave inglesa; "listo" se apaga y suma un tilde verde.
+   * Círculo con el número de nivel (1/2/3) y el color del diseño. "En obra" suma una
+   * insignia con una llave; "arreglado" pasa a verde con un tilde en lugar del número.
+   * Destacado (el del detalle abierto): más grande y con un halo del mismo color.
    */
-  private crearIcono(bache: Bache): L.DivIcon {
-    const tamano = 40;
-    const resuelto = bache.estado === 'reparado';
-    const sombra = 'drop-shadow(0 2px 3px rgba(51,48,43,.4))';
-    const imagen = `<img src="${this.iconoDeSeveridad(bache.severidad)}" alt="" width="${tamano}" height="${tamano}" draggable="false" style="display:block;${resuelto ? `opacity:.6;filter:grayscale(.85) ${sombra}` : `filter:${sombra}`}" />`;
-
-    const insignia = (fondo: string, trazo: string) =>
-      `<span style="position:absolute;right:-3px;bottom:0;width:17px;height:17px;border-radius:50%;background:${fondo};border:2px solid #fffdf9;display:grid;place-items:center"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#fffdf9" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" width="9" height="9">${trazo}</svg></span>`;
-    const llave = '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>';
-    const tilde = '<path d="M20 6 9 17l-5-5"/>';
-    const marca =
+  private crearIcono(bache: Bache, destacado = false): L.DivIcon {
+    const tamano = destacado ? 40 : 32;
+    const nivel = nivelDe(bache.severidad);
+    const arreglado = bache.estado === 'reparado';
+    const fondo = arreglado ? COLOR_REPARADO : nivel.color;
+    const tinta = arreglado ? '#FFFFFF' : nivel.tinta;
+    const contenido = arreglado
+      ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"/></svg>'
+      : String(nivel.nivel);
+    const insigniaObra =
       bache.estado === 'en-reparacion'
-        ? insignia('#33302b', llave)
-        : resuelto
-          ? insignia(COLOR_REPARADO, tilde)
-          : '';
+        ? '<span style="position:absolute;right:-5px;bottom:-5px;width:17px;height:17px;border-radius:50%;background:#1D2420;border:2px solid #FFFFFF;box-sizing:border-box;display:flex;align-items:center;justify-content:center"><svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg></span>'
+        : '';
 
+    const circulo = `<span style="position:relative;width:${tamano}px;height:${tamano}px;border-radius:50%;background:${fondo};border:3px solid #FFFFFF;box-shadow:0 ${destacado ? '3px 10px rgba(0,0,0,.35)' : '2px 6px rgba(0,0,0,.3)'};box-sizing:border-box;color:${tinta};font:700 ${destacado ? 16 : 13}px 'DM Sans',system-ui,sans-serif;display:flex;align-items:center;justify-content:center">${contenido}${insigniaObra}</span>`;
+    // Halo: el color del círculo al 18 % de opacidad (sufijo hex 2E).
+    const halo = 58;
+    const html = destacado
+      ? `<span style="width:${halo}px;height:${halo}px;border-radius:50%;background:${fondo}2E;display:flex;align-items:center;justify-content:center">${circulo}</span>`
+      : circulo;
+    const lado = destacado ? halo : tamano;
+
+    return L.divIcon({ className: '', html, iconSize: [lado, lado], iconAnchor: [lado / 2, lado / 2] });
+  }
+
+  /** Punto azul con halo, como en el diseño. */
+  private iconoUbicacion(): L.DivIcon {
     return L.divIcon({
       className: '',
-      html: `<span style="position:relative;display:block;width:${tamano}px;height:${tamano}px">${imagen}${marca}</span>`,
-      iconSize: [tamano, tamano],
-      iconAnchor: [tamano / 2, tamano / 2],
-      popupAnchor: [0, -tamano / 2], // el popup apunta al borde superior del ícono, no a su centro
+      html: '<span style="width:28px;height:28px;border-radius:50%;background:rgba(43,108,214,.18);display:flex;align-items:center;justify-content:center"><span style="width:14px;height:14px;border-radius:50%;background:#2B6CD6;border:3px solid #FFFFFF;box-sizing:border-box"></span></span>',
+      iconSize: [28, 28],
+      iconAnchor: [14, 14],
     });
-  }
-
-  protected tiempoRelativo(fecha: Date): string {
-    const minutos = Math.floor((Date.now() - fecha.getTime()) / 60000);
-    if (minutos < 1) return 'recién';
-    if (minutos < 60) return `hace ${minutos} min`;
-    const horas = Math.floor(minutos / 60);
-    if (horas < 24) return `hace ${horas} h`;
-    const dias = Math.floor(horas / 24);
-    if (dias === 1) return 'ayer';
-    return `hace ${dias} días`;
-  }
-
-  private popupHtml(bache: Bache): string {
-    const estadoInfo = this.estados.find((e) => e.valor === bache.estado);
-    const severidadInfo = this.severidades.find((s) => s.valor === bache.severidad);
-    const colorEstado = this.colorDeBache(bache);
-    const urlFoto = this.bachesService.urlFoto(bache.fotoUrl);
-    const foto = urlFoto
-      ? `<div style="position:relative;height:96px;border-radius:14px;overflow:hidden;margin-bottom:10px"><img src="${urlFoto}" alt="Foto del bache" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover" /></div>`
-      : '';
-
-    return `
-      <div style="font-family:var(--font-body);min-width:190px">
-        ${foto}
-        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:8px">
-          <div>
-            <div class="disp" style="font-size:15px">${this.escapeHtml(formatearDireccion(bache))}</div>
-            ${bache.barrio ? `<div style="font-size:12px;color:rgba(51,48,43,.55)">${this.escapeHtml(bache.barrio)}</div>` : ''}
-          </div>
-          <span style="font-size:11px;font-weight:700;color:${colorEstado}">${estadoInfo?.etiqueta ?? bache.estado}</span>
-        </div>
-        <div style="font-size:12.5px;color:rgba(51,48,43,.6);display:flex;flex-direction:column;gap:4px">
-          <div><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${severidadInfo?.color ?? '#c2683f'};margin-right:6px;vertical-align:middle"></span>${severidadInfo?.etiqueta ?? bache.severidad}</div>
-          <div>Reportado por ${this.escapeHtml(bache.usuario)}</div>
-          <div>${bache.fecha.toLocaleString()}</div>
-        </div>
-      </div>
-    `;
-  }
-
-  private escapeHtml(valor: string): string {
-    const div = document.createElement('div');
-    div.textContent = valor;
-    return div.innerHTML;
   }
 }

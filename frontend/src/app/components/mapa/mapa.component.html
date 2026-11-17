@@ -1,264 +1,245 @@
-<div class="relative w-full h-screen" style="background:var(--cream)">
-  <div #mapContainer class="w-full h-full"></div>
+<div class="relative h-dvh w-full overflow-hidden bg-fondo font-sans text-tinta" [style.--hoja-h]="alturaHoja() + 'px'">
+  <div #mapContainer class="h-full w-full"></div>
 
-  <!-- Barra superior: marca, filtros, últimos reportes + stats -->
-  <div class="absolute left-0 right-0 top-0 z-1000 overflow-hidden pointer-events-none">
-    <div
-      class="flex flex-wrap items-start gap-4 p-4"
-      style="transition:transform .4s cubic-bezier(.4,0,.2,1), opacity .3s ease"
-      [style.transform]="barraVisible() ? 'translateY(0)' : 'translateY(-115%)'"
-      [style.opacity]="barraVisible() ? 1 : 0"
+  @if (!reportando() && !detalleAbierto()) {
+    <app-barra-mapa
+      class="absolute top-3 right-3 left-3 z-1000 md:right-auto md:max-w-[calc(100%-24px)]"
+      [(estado)]="filtroEstado"
+      [(nivel)]="nivelSeleccionado"
+      [(busqueda)]="busqueda"
+      [conteo]="visibles().length"
+      (acercaDe)="mostrarAcercaDe()"
+    />
+
+    <!-- En celular ocupa el ancho de abajo; en pantallas anchas flota a la izquierda. -->
+    <app-hoja-reportes
+      class="absolute inset-x-0 bottom-0 z-1000 block overflow-hidden rounded-t-3xl bg-white shadow-[0_-6px_24px_rgba(29,36,32,.14)] transition-[height] duration-250 ease-in-out md:inset-x-auto md:bottom-3 md:left-3 md:w-[400px] md:rounded-3xl"
+      [style.height.px]="alturaHoja()"
+      [reportes]="enZona()"
+      [subtitulo]="subtituloHoja()"
+      [(abierta)]="hojaAbierta"
+      (seleccionar)="irAlReporte($event)"
+    />
+
+    <button
+      type="button"
+      class="absolute right-4 bottom-[calc(var(--hoja-h)+16px)] z-1000 flex h-[52px] cursor-pointer items-center gap-2 rounded-[26px] border-0 bg-verde pr-5 pl-4 text-[15px] font-bold text-white shadow-[0_6px_18px_rgba(63,110,74,.4)] transition-[bottom] duration-250 ease-in-out hover:bg-verde-oscuro md:bottom-6"
+      (click)="abrirReporte()"
     >
-    <div class="soft-card pointer-events-auto flex flex-col gap-4" style="width:min(392px,90vw);padding:20px 22px">
-      <div class="flex items-center gap-2.5">
-        <span style="width:30px;height:30px;border-radius:50%;background:var(--grass);display:grid;place-items:center;flex:none">
-          <span style="width:10px;height:10px;border-radius:50%;background:var(--paper)"></span>
-        </span>
-        <span class="disp" style="font-size:21px">GeoBaches</span>
-      </div>
-
-      <div class="flex flex-wrap gap-2">
-        @for (opcion of estados; track opcion.valor) {
-          <button
-            type="button"
-            (click)="toggleFiltroEstado(opcion.valor)"
-            class="soft-chip"
-            [class.on]="filtroEstado()[opcion.valor]"
-          >
-            {{ opcion.etiqueta }} · {{ conteoPorEstado()[opcion.valor] }}
-          </button>
-        }
-        <button type="button" (click)="toggleSoloAlta()" class="soft-chip" [class.on]="soloAlta()">
-          Solo peligrosas
-        </button>
-      </div>
-
-      @if (ultimosReportes().length) {
-        <div style="height:1px;background:var(--line)"></div>
-        <div class="flex flex-col gap-3">
-          <button
-            type="button"
-            class="flex items-center justify-between"
-            style="width:100%;padding:0;border:0;background:none;cursor:pointer"
-            (click)="toggleListaReportes()"
-            [attr.aria-expanded]="listaReportesVisible()"
-            [attr.aria-label]="listaReportesVisible() ? 'Ocultar reportes de tu zona' : 'Mostrar reportes de tu zona'"
-          >
-            <span class="soft-lab" style="margin:0">Reportes de tu zona</span>
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              style="width:16px;height:16px;color:rgba(51,48,43,.55);transition:transform .3s ease"
-              [style.transform]="listaReportesVisible() ? 'rotate(0deg)' : 'rotate(180deg)'"
-            >
-              <path d="m18 15-6-6-6 6"></path>
-            </svg>
-          </button>
-
-          @if (listaReportesVisible()) {
-          @for (bache of ultimosReportes(); track bache.id) {
-            <div class="flex items-center gap-3 fila-seleccionable" (click)="irAlReporte(bache)">
-              <span style="width:38px;height:38px;border-radius:14px;flex:none;display:grid;place-items:center;background:rgba(51,48,43,.05)">
-                <img
-                  [src]="iconoDeSeveridad(bache.severidad)"
-                  alt=""
-                  width="30"
-                  height="30"
-                  [style.opacity]="bache.estado === 'reparado' ? 0.6 : 1"
-                  [style.filter]="bache.estado === 'reparado' ? 'grayscale(.85)' : ''"
-                />
-              </span>
-              <div style="flex:1;min-width:0">
-                <div style="font-weight:700;font-size:14.5px">{{ direccion(bache) }}</div>
-                <div class="text-muted" style="font-size:12.5px">
-                  {{ bache.barrio ? bache.barrio + ' · ' : '' }}{{ bache.usuario }} · {{ tiempoRelativo(bache.fecha) }}
-                </div>
-              </div>
-              <span style="font-size:12.5px;font-weight:700" [style.color]="colorDeBache(bache)">
-                {{ bache.estado === 'reparado' ? 'Listo' : etiquetaSeveridad(bache.severidad) }}
-              </span>
-            </div>
-          }
-          }
-        </div>
-      }
-    </div>
-
-    <div class="flex-1"></div>
-
-    </div>
-  </div>
-
-  <!-- Pestaña para mostrar/ocultar la barra superior -->
-  <button
-    type="button"
-    class="absolute z-1000 pointer-events-auto"
-    style="top:0;left:50%;transform:translateX(-50%);width:40px;height:22px;border-radius:0 0 14px 14px;display:grid;place-items:center;background:var(--paper);box-shadow:0 4px 10px rgba(51,48,43,.12);border:0;cursor:pointer"
-    (click)="toggleBarra()"
-    [attr.aria-label]="barraVisible() ? 'Ocultar barra superior' : 'Mostrar barra superior'"
-  >
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      stroke-width="2"
-      style="width:14px;height:14px;transition:transform .35s ease"
-      [style.transform]="barraVisible() ? 'rotate(0deg)' : 'rotate(180deg)'"
-    >
-      <path d="m18 15-6-6-6 6"></path>
-    </svg>
-  </button>
-
-  @if (error() && !formVisible()) {
-    <div class="absolute z-1000 pointer-events-none" style="top:200px;left:50%;transform:translateX(-50%)">
-      <div class="soft-card" style="padding:10px 18px;background:#fff0ea">
-        <span style="font-size:12.5px;color:var(--danger);font-weight:500">{{ error() }}</span>
-      </div>
-    </div>
-  }
-
-  @if (mensajeExito()) {
-    <div class="absolute z-1000 pointer-events-none" style="top:34px;left:50%;transform:translateX(-50%);max-width:min(360px,88vw)">
-      <div class="soft-card" style="padding:10px 18px;text-align:center">
-        <span style="font-size:12.5px;color:var(--grass);font-weight:500">{{ mensajeExito() }}</span>
-      </div>
-    </div>
-  }
-
-  <!-- Controles del mapa: zoom y ubicación -->
-  <div class="absolute right-4 bottom-8 z-1000 flex flex-col gap-2">
-    <button type="button" class="soft-card soft-btn icon" style="background:var(--paper);color:var(--ink)" (click)="zoomIn()" aria-label="Acercar">
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="width:18px;height:18px">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.4" stroke-linecap="round" aria-hidden="true">
         <path d="M12 5v14M5 12h14"></path>
       </svg>
+      Reportar bache
     </button>
-    <button type="button" class="soft-card soft-btn icon" style="background:var(--paper);color:var(--ink)" (click)="zoomOut()" aria-label="Alejar">
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="width:18px;height:18px">
-        <path d="M5 12h14"></path>
-      </svg>
-    </button>
-    <button type="button" class="soft-card soft-btn icon" style="background:var(--paper);color:var(--ink)" (click)="irAMiUbicacion()" aria-label="Mi ubicación">
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" style="width:19px;height:19px">
-        <circle cx="12" cy="12" r="7"></circle>
-        <circle cx="12" cy="12" r="2.5" fill="currentColor" stroke="none"></circle>
-        <path d="M12 2v3M12 19v3M2 12h3M19 12h3"></path>
-      </svg>
-    </button>
-  </div>
+  }
 
-  <!-- Pista de uso -->
-  <div class="absolute left-4 bottom-4 z-1000 soft-card pointer-events-none" style="padding:10px 16px">
-    <span class="text-muted" style="font-size:12.5px">Tocá el mapa donde está el bache</span>
-  </div>
+  @if (!detalleAbierto()) {
+  <button
+    type="button"
+    aria-label="Ir a mi ubicación"
+    class="absolute right-4 z-1000 flex size-12 cursor-pointer items-center justify-center rounded-full border-0 bg-white shadow-[0_4px_14px_rgba(29,36,32,.18)] transition-[bottom] duration-250 ease-in-out"
+    [class]="reportando() ? 'top-3.5' : 'bottom-[calc(var(--hoja-h)+84px)] md:bottom-[92px]'"
+    (click)="irAMiUbicacion()"
+  >
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1D2420" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="7"></circle>
+      <circle cx="12" cy="12" r="2.5"></circle>
+      <path d="M12 2v3M12 19v3M2 12h3M19 12h3"></path>
+    </svg>
+  </button>
+  }
 
-  @if (formVisible()) {
-    <div class="absolute inset-0 z-1000 flex items-center justify-center px-4 pointer-events-none">
-      <div class="pointer-events-auto" style="width:min(342px,100%)">
-        <div class="soft-card flex flex-col gap-4" style="padding:22px;box-shadow:0 18px 44px rgba(51,48,43,.2)">
-          <div class="flex justify-between items-start gap-2.5">
-            <div>
-              <div class="disp" style="font-size:24px">Contanos del bache</div>
-            </div>
-            <button
-              type="button"
-              class="soft-btn ghost"
-              style="width:34px;height:34px;padding:0;border-radius:50%;font-weight:400;font-size:17px"
-              (click)="cancelarReporte()"
-              [disabled]="guardando()"
-              aria-label="Cerrar"
-            >
-              ×
-            </button>
-          </div>
-
-          <div style="font-size:13px;color:rgba(51,48,43,.6);background:rgba(79,138,91,.1);border-radius:12px;padding:10px 13px">
-            {{ clickLatLng()?.lat | number: '1.5-5' }}, {{ clickLatLng()?.lng | number: '1.5-5' }}
-          </div>
-
-          <form (ngSubmit)="guardarBache()" class="flex flex-col gap-4">
-            <div>
-              <label class="soft-lab" for="usuario">¿Quién lo reporta?</label>
-              <input id="usuario" name="usuario" class="soft-in" type="text" [(ngModel)]="usuario" required placeholder="Tu nombre" />
-            </div>
-
-            <div class="flex flex-col gap-2.5">
-              <span class="soft-lab" style="margin:0">
-                Dirección
-                @if (buscandoDireccion()) {
-                  <span style="font-weight:400"> · buscando…</span>
-                } @else {
-                  <span style="font-weight:400"> · la sugerimos por el punto, corregila si hace falta</span>
-                }
-              </span>
-              <div class="flex gap-2.5">
-                <input name="calle" class="soft-in" style="flex:1;min-width:0" type="text" [(ngModel)]="calle" placeholder="Calle" />
-                <input name="altura" class="soft-in" style="width:84px;flex:none" type="text" inputmode="numeric" [(ngModel)]="altura" placeholder="Altura" />
-              </div>
-              <input name="barrio" class="soft-in" type="text" [(ngModel)]="barrio" placeholder="Barrio" />
-            </div>
-
-            <div>
-              <span class="soft-lab">¿Cómo está el bache?</span>
-              <div class="flex gap-2">
-                @for (opcion of severidades; track opcion.valor) {
-                  <button
-                    type="button"
-                    class="sev"
-                    (click)="severidad = opcion.valor"
-                    [style.background]="severidad === opcion.valor ? (opcion.color + '29') : ''"
-                    [style.fontWeight]="severidad === opcion.valor ? 700 : 500"
-                  >
-                    <span style="width:16px;height:16px;border-radius:50%" [style.background]="opcion.color"></span>
-                    {{ opcion.etiqueta }}
-                  </button>
-                }
-              </div>
-            </div>
-
-            <div>
-              <span class="soft-lab">Una foto ayuda a priorizar (opcional)</span>
-              <label
-                for="foto"
-                style="position:relative;display:block;height:96px;border-radius:16px;background:rgba(51,48,43,.05);cursor:pointer;overflow:hidden"
-              >
-                @if (procesandoFoto()) {
-                  <div style="position:absolute;inset:0;display:grid;place-items:center;color:rgba(51,48,43,.6);font-size:12.5px">
-                    Procesando foto…
-                  </div>
-                } @else if (fotoPreview()) {
-                  <img [src]="fotoPreview()" alt="Vista previa" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover" />
-                } @else {
-                  <div style="position:absolute;inset:0;display:grid;place-items:center;text-align:center;color:rgba(51,48,43,.5)">
-                    <div>
-                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width:22px;height:22px;margin:0 auto">
-                        <path d="M14.5 4h-5L8 6H4.5A1.5 1.5 0 0 0 3 7.5v11A1.5 1.5 0 0 0 4.5 20h15a1.5 1.5 0 0 0 1.5-1.5v-11A1.5 1.5 0 0 0 19.5 6H16z"></path>
-                        <circle cx="12" cy="13" r="3.5"></circle>
-                      </svg>
-                      <div style="font-size:12.5px;margin-top:4px">Subir o sacar una foto</div>
-                    </div>
-                  </div>
-                }
-              </label>
-              <input id="foto" name="foto" type="file" accept="image/*,.heic,.heif" (change)="onFotoSeleccionada($event)" class="hidden" />
-            </div>
-
-            @if (error()) {
-              <p style="color:var(--danger);font-size:12.5px;margin:0">{{ error() }}</p>
-            }
-
-            <div class="flex gap-2.5">
-              <button type="button" class="soft-btn ghost" style="flex:none" (click)="cancelarReporte()" [disabled]="guardando()">Cancelar</button>
-              <button type="submit" class="soft-btn" style="flex:1" [disabled]="!usuario.trim() || guardando() || procesandoFoto()">
-                {{ guardando() ? 'Enviando...' : 'Enviar reporte' }}
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>
+  @if (!detalleAbierto() && (aviso() || (error() && !reportando()))) {
+    <div class="pointer-events-none absolute top-[124px] left-1/2 z-1000 w-[min(360px,calc(100%-32px))] -translate-x-1/2 md:left-[calc(400px+24px)] md:translate-x-0">
+      @if (aviso()) {
+        <div class="rounded-2xl bg-tinta px-4 py-3 text-center text-[13px] font-medium text-white shadow-[0_4px_16px_rgba(29,36,32,.18)]">{{ aviso() }}</div>
+      } @else {
+        <div class="rounded-2xl bg-[#F8DADA] px-4 py-3 text-center text-[13px] font-medium text-[#8E1A1A] shadow-[0_4px_16px_rgba(29,36,32,.12)]">{{ error() }}</div>
+      }
     </div>
   }
+
+  @if (reportando()) {
+    <!-- Pin fijo: se mueve el mapa, no el pin. La punta marca el punto del reporte. -->
+    <div
+      aria-hidden="true"
+      class="pointer-events-none absolute z-1000 flex w-10 flex-col items-center transition-[left,top] duration-250 ease-in-out"
+      [style.left.px]="posicionPin().x - 20"
+      [style.top.px]="posicionPin().y - 46"
+    >
+      <span class="transition-transform duration-150" [class.-translate-y-2]="moviendo()">
+        <span class="flex size-10 -rotate-45 items-center justify-center rounded-[50%_50%_50%_0] border-3 border-white bg-verde shadow-[0_4px_10px_rgba(0,0,0,.3)]">
+          <span class="size-3 rounded-full bg-white"></span>
+        </span>
+      </span>
+      <span class="mt-1.5 h-1 w-2.5 rounded-[50%] bg-black/25"></span>
+    </div>
+
+    <div
+      class="pointer-events-none absolute z-1000 -translate-x-1/2 rounded-[10px] bg-tinta px-3 py-2 text-[13px] font-medium whitespace-nowrap text-white transition-[left,top] duration-250 ease-in-out"
+      [style.left.px]="posicionPin().x"
+      [style.top.px]="topAyuda()"
+    >
+      {{ textoAyuda() }}
+    </div>
+
+    <button
+      type="button"
+      aria-label="Cancelar reporte"
+      class="absolute top-3.5 left-3.5 z-1000 flex size-12 cursor-pointer items-center justify-center rounded-full border-0 bg-white shadow-[0_4px_14px_rgba(29,36,32,.18)] md:left-[calc(400px+26px)]"
+      [disabled]="guardando()"
+      (click)="cancelarReporte()"
+    >
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1D2420" stroke-width="2.2" stroke-linecap="round" aria-hidden="true">
+        <path d="M6 6l12 12M18 6L6 18"></path>
+      </svg>
+    </button>
+
+    <!-- Formulario: en celular, panel inferior plegable; en pantallas anchas, columna a la izquierda. -->
+    <section
+      aria-labelledby="titulo-reporte"
+      class="absolute inset-x-0 bottom-0 z-1000 flex h-(--form-h) flex-col overflow-hidden rounded-t-3xl bg-white shadow-[0_-6px_24px_rgba(29,36,32,.14)] transition-[height] duration-250 ease-in-out md:inset-x-auto md:top-3 md:bottom-3 md:left-3 md:h-auto md:w-[400px] md:rounded-3xl"
+      [style.--form-h]="alturaFormulario() + 'px'"
+    >
+      <div class="flex shrink-0 flex-col gap-3.5 px-5 pt-1.5 md:pt-5">
+        <button
+          type="button"
+          class="flex h-8 w-16 shrink-0 cursor-pointer items-center justify-center self-center rounded-2xl border-0 bg-superficie p-0 md:hidden"
+          [attr.aria-expanded]="formularioAbierto()"
+          [attr.aria-label]="formularioAbierto() ? 'Ocultar formulario' : 'Mostrar formulario'"
+          (click)="alternarFormulario()"
+        >
+          <svg
+            width="22"
+            height="22"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="#3B413D"
+            stroke-width="2.4"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+            class="transition-transform duration-250 ease-in-out"
+            [class.rotate-180]="!formularioAbierto()"
+          >
+            <path d="M6 9l6 6 6-6"></path>
+          </svg>
+        </button>
+
+        <h1 id="titulo-reporte" class="m-0 font-sans text-[22px] font-bold tracking-[-0.01em]">Nuevo reporte</h1>
+
+        <div class="flex items-center gap-2.5 rounded-[14px] bg-superficie px-3.5 py-3">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#3F6E4A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="shrink-0">
+            <path d="M12 21s-7-6.2-7-11.5A7 7 0 0119 9.5C19 14.8 12 21 12 21z"></path>
+            <circle cx="12" cy="9.5" r="2.5"></circle>
+          </svg>
+          <div class="flex min-w-0 flex-1 flex-col gap-px" aria-live="polite">
+            @if (punto(); as p) {
+              <span class="truncate text-[15px] font-bold">
+                {{ buscandoDireccion() ? 'Buscando dirección…' : (calle || altura) ? (calle + ' ' + altura).trim() : 'Punto elegido' }}
+              </span>
+              <span class="truncate text-[13px] text-apagado">
+                {{ barrio || ((p.lat | number: '1.5-5') + ', ' + (p.lng | number: '1.5-5')) }}
+              </span>
+            } @else {
+              <span class="text-[15px] font-bold">Buscando el punto…</span>
+            }
+          </div>
+          <button
+            type="button"
+            class="shrink-0 cursor-pointer rounded-lg border-0 bg-transparent px-1.5 py-1 text-[13px] font-bold text-verde disabled:cursor-default disabled:opacity-40"
+            [attr.aria-expanded]="editandoDireccion()"
+            [disabled]="!punto() || buscandoDireccion()"
+            (click)="editandoDireccion.set(!editandoDireccion()); formularioAbierto.set(true)"
+          >
+            {{ editandoDireccion() ? 'Listo' : 'Corregir' }}
+          </button>
+        </div>
+      </div>
+
+      <!-- Plegado (celular) solo se ve el encabezado con la dirección, como en el diseño. -->
+      <form
+        (ngSubmit)="guardarBache()"
+        class="flex min-h-0 flex-1 flex-col {{ formularioAbierto() ? '' : 'max-md:hidden' }}"
+      >
+        <div class="flex min-h-0 flex-1 flex-col gap-3.5 overflow-y-auto px-5 pt-3.5 pb-1">
+          @if (editandoDireccion()) {
+            <div class="flex flex-col gap-2.5">
+              <div class="flex gap-2.5">
+                <input name="calle" class="soft-in min-w-0 flex-1" type="text" [(ngModel)]="calle" placeholder="Calle" aria-label="Calle" />
+                <input name="altura" class="soft-in w-[84px] flex-none" type="text" inputmode="numeric" [(ngModel)]="altura" placeholder="Altura" aria-label="Altura" />
+              </div>
+              <input name="barrio" class="soft-in" type="text" [(ngModel)]="barrio" placeholder="Barrio" aria-label="Barrio" />
+            </div>
+          }
+
+          <fieldset class="m-0 flex flex-col gap-2 border-0 p-0">
+            <legend class="mb-2 p-0 text-[15px] font-bold">¿Qué tan grave es?</legend>
+            @for (opcion of severidades; track opcion.valor) {
+              <button
+                type="button"
+                class="box-border flex w-full cursor-pointer items-center gap-3 rounded-[14px] border-2 px-3.5 py-3 text-left"
+                [attr.aria-pressed]="nivelReporte() === opcion.valor"
+                [style.background]="nivelReporte() === opcion.valor ? opcion.fondo : '#FFFFFF'"
+                [style.borderColor]="nivelReporte() === opcion.valor ? opcion.color : '#E4E1D9'"
+                (click)="nivelReporte.set(opcion.valor)"
+              >
+                <span
+                  aria-hidden="true"
+                  class="flex size-9 shrink-0 items-center justify-center rounded-full text-[15px] font-bold"
+                  [style.background]="opcion.color"
+                  [style.color]="opcion.tinta"
+                >{{ opcion.nivel }}</span>
+                <span class="flex flex-1 flex-col gap-0.5">
+                  <span class="text-base font-bold text-tinta">{{ opcion.etiqueta }}</span>
+                  <span class="text-[13px] leading-[1.35] text-apagado">{{ opcion.descripcion }}</span>
+                </span>
+              </button>
+            }
+          </fieldset>
+
+          <div>
+            <label class="soft-lab" for="usuario">¿Quién lo reporta?</label>
+            <input id="usuario" name="usuario" class="soft-in" type="text" autocomplete="name" [(ngModel)]="usuario" required placeholder="Tu nombre" />
+          </div>
+
+          <label
+            for="foto"
+            class="relative flex min-h-12 shrink-0 cursor-pointer items-center justify-center gap-2 overflow-hidden rounded-[14px] border-[1.5px] border-dashed border-[#BDB8AD] bg-white text-[15px] font-medium"
+            [class.h-32]="fotoPreview()"
+          >
+            @if (procesandoFoto()) {
+              <span class="text-apagado">Procesando foto…</span>
+            } @else if (fotoPreview()) {
+              <img [src]="fotoPreview()" alt="Vista previa" class="absolute inset-0 size-full object-cover" />
+            } @else {
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1D2420" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M4 8h3l2-3h6l2 3h3v11H4z"></path>
+                <circle cx="12" cy="13" r="3.5"></circle>
+              </svg>
+              Agregar foto (opcional)
+            }
+          </label>
+          <input id="foto" name="foto" type="file" accept="image/*,.heic,.heif" (change)="onFotoSeleccionada($event)" class="hidden" />
+
+          @if (error()) {
+            <p class="m-0 text-[13px] text-[#8E1A1A]">{{ error() }}</p>
+          }
+        </div>
+
+        <div class="shrink-0 px-5 pt-2.5 pb-6">
+          <button
+            type="submit"
+            class="h-[54px] w-full cursor-pointer rounded-2xl border-0 bg-verde text-base font-bold text-white hover:bg-verde-oscuro disabled:cursor-not-allowed disabled:opacity-50"
+            [disabled]="!punto() || !usuario.trim() || guardando() || procesandoFoto()"
+          >
+            {{ guardando() ? 'Enviando...' : 'Enviar reporte' }}
+          </button>
+        </div>
+      </form>
+    </section>
+  }
+
+  <!-- Detalle de un bache (/bache/:id), encima del mapa. -->
+  <router-outlet />
 </div>

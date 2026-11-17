@@ -1,0 +1,72 @@
+<!-- Celular: buscador arriba y chips con scroll horizontal. Escritorio: todo en una fila, con el ancho que necesite. -->
+<div class="flex flex-col gap-2.5 md:flex-row md:flex-wrap md:items-center">
+  <div class="flex items-center gap-2.5 md:contents">
+    <div class="flex h-[52px] min-w-0 flex-1 items-center md:order-1 md:w-[340px] md:flex-none gap-2.5 rounded-2xl bg-white py-1.5 pr-3 pl-3.5 shadow-[0_4px_16px_rgba(29,36,32,.12)]">
+      <div aria-hidden="true" class="flex size-6 shrink-0 items-center justify-center rounded-full bg-verde">
+        <div class="size-[9px] rounded-full bg-white"></div>
+      </div>
+      <label class="flex min-w-0 flex-1 items-center">
+        <span class="sr-only">Buscar calle o barrio</span>
+        <input
+          type="search"
+          placeholder="Buscar calle o barrio"
+          class="w-full border-0 bg-transparent text-[15px] text-tinta outline-0 placeholder:text-apagado"
+          [value]="busqueda()"
+          (input)="busqueda.set($any($event.target).value)"
+        />
+      </label>
+    </div>
+
+    <!-- Fuera del buscador: es información del sitio, no una acción sobre la búsqueda. -->
+    <button
+      type="button"
+      aria-label="Acerca de GeoBaches"
+      class="flex size-[52px] shrink-0 cursor-pointer md:order-2 items-center justify-center rounded-2xl border-0 bg-white shadow-[0_4px_16px_rgba(29,36,32,.12)]"
+      (click)="acercaDe.emit()"
+    >
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1D2420" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="9"></circle>
+        <path d="M12 11v5M12 7.5v.01"></path>
+      </svg>
+    </button>
+  </div>
+
+  <div class="sin-scrollbar flex gap-2 overflow-x-auto pb-1 md:order-3 md:flex-wrap md:overflow-visible md:pb-0">
+    @for (opcion of estados; track opcion.valor) {
+      @if (estado() === opcion.valor) {
+        <button
+          type="button"
+          aria-pressed="true"
+          class="flex h-9 shrink-0 cursor-pointer items-center gap-2 rounded-[18px] border-0 bg-tinta pr-1.5 pl-3.5 text-sm font-medium text-white"
+        >
+          {{ opcion.filtro }}
+          <span class="flex h-6 min-w-6 items-center justify-center rounded-xl bg-white/20 px-1.5 text-xs font-bold">{{ conteo() }}</span>
+        </button>
+      } @else {
+        <button
+          type="button"
+          aria-pressed="false"
+          class="h-9 shrink-0 cursor-pointer rounded-[18px] border-0 bg-white px-3.5 text-sm font-medium text-tinta shadow-[0_2px_8px_rgba(29,36,32,.10)]"
+          (click)="estado.set(opcion.valor)"
+        >
+          {{ opcion.filtro }}
+        </button>
+      }
+    }
+
+    <div aria-hidden="true" class="h-[22px] w-px shrink-0 self-center bg-tinta/20"></div>
+
+    @for (opcion of niveles; track opcion.valor) {
+      <button
+        type="button"
+        class="flex h-9 shrink-0 cursor-pointer items-center gap-1.5 rounded-[18px] border-0 pr-3.5 pl-2.5 text-sm font-medium shadow-[0_2px_8px_rgba(29,36,32,.10)]"
+        [attr.aria-pressed]="nivel() === opcion.valor"
+        [class]="nivel() === opcion.valor ? 'bg-tinta text-white' : 'bg-white text-tinta'"
+        (click)="alternarNivel(opcion.valor)"
+      >
+        <span aria-hidden="true" class="size-3 rounded-full" [style.background]="opcion.color"></span>
+        {{ opcion.etiqueta }}
+      </button>
+    }
+  </div>
+</div>

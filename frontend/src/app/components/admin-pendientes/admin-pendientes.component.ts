@@ -16,7 +16,7 @@ import {
   inject,
   signal,
 } from '@angular/core';
-import { Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import * as L from 'leaflet';
 import { AuthService } from '../../services/auth.service';
 import { BachesService } from '../../services/baches.service';
@@ -34,6 +34,7 @@ export class AdminPendientesComponent implements OnInit, AfterViewInit, OnDestro
   private readonly bachesService = inject(BachesService);
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
   private map!: L.Map;
   private marcadorSeleccionado: L.Marker | undefined;
 
@@ -92,7 +93,10 @@ export class AdminPendientesComponent implements OnInit, AfterViewInit, OnDestro
       next: (pendientes) => {
         this.pendientes.set(pendientes);
         this.cargando.set(false);
-        if (pendientes.length) this.seleccionar(pendientes[0]);
+        // ?id=... (desde el dashboard) abre ese reporte; si no está o ya no está pendiente, el primero.
+        const pedido = this.route.snapshot.queryParamMap.get('id');
+        const inicial = pendientes.find((bache) => bache.id === pedido) ?? pendientes[0];
+        if (inicial) this.seleccionar(inicial);
       },
       error: () => {
         this.error.set('No se pudieron cargar los reportes pendientes. ¿Está corriendo el backend?');

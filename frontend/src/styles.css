@@ -1,3 +1,23 @@
 /* You can add global styles to this file, and also import other style files */
 @import "tailwindcss";
-@import "./styles/barrio.css";
+/* En una capa: sin esto, sus reglas (ej. la fuente de h1) les ganan a las utilidades de Tailwind. */
+@import "./styles/barrio.css" layer(components);
+
+/* Paleta de docs/design/geobaches-diseno: genera clases como bg-verde, text-tinta, text-apagado. */
+@theme {
+  --font-sans: "DM Sans", system-ui, sans-serif;
+
+  --color-verde: #3F6E4A;
+  --color-verde-oscuro: #2C5236;
+  --color-tinta: #1D2420;
+  --color-apagado: #5E655F;
+  --color-icono: #3B413D;
+  --color-fondo: #ECE8DF;
+  --color-superficie: #F2F0EA;
+  --color-separador: #EFEDE7;
+  --color-ubicacion: #2B6CD6;
+}
+
+/* Chips con scroll horizontal sin barra visible. */
+.sin-scrollbar { scrollbar-width: none; }
+.sin-scrollbar::-webkit-scrollbar { display: none; }

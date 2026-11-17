@@ -26,7 +26,7 @@ export class LoginComponent {
     this.error.set(null);
 
     this.auth.login(this.usuario.trim(), this.password).subscribe({
-      next: () => this.router.navigateByUrl('/admin/pendientes'),
+      next: () => this.router.navigateByUrl('/admin'),
       error: () => {
         this.enviando.set(false);
         this.error.set('Usuario o contraseña incorrectos.');

@@ -23,6 +23,11 @@ describe('App', () => {
     expect(harness.routeNativeElement?.tagName.toLowerCase()).toBe('app-mapa');
   });
 
+  it('should redirect to login when visiting /admin without a session', async () => {
+    const harness = await RouterTestingHarness.create('/admin');
+    expect(harness.routeNativeElement?.tagName.toLowerCase()).toBe('app-login');
+  });
+
   it('should redirect to login when visiting /admin/pendientes without a session', async () => {
     const harness = await RouterTestingHarness.create('/admin/pendientes');
     expect(harness.routeNativeElement?.tagName.toLowerCase()).toBe('app-login');

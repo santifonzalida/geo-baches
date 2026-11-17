@@ -5,6 +5,7 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { BachesModule } from './baches/baches.module';
 import { Bache } from './baches/entities/bache.entity';
+import { Confirmacion } from './baches/entities/confirmacion.entity';
 import { GeocodingModule } from './geocoding/geocoding.module';
 import { AuthModule } from './auth/auth.module';
 import { UsuariosModule } from './usuarios/usuarios.module';
@@ -23,7 +24,7 @@ import { Rol } from './usuarios/entities/rol.entity';
         username: config.get<string>('DB_USERNAME'),
         password: config.get<string>('DB_PASSWORD'),
         database: config.get<string>('DB_NAME'),
-        entities: [Bache, Usuario, Rol],
+        entities: [Bache, Confirmacion, Usuario, Rol],
         synchronize: true,
       }),
     }),

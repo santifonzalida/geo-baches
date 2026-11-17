@@ -1,0 +1,128 @@
+<a
+  routerLink="/"
+  aria-label="Volver al mapa"
+  class="absolute top-3.5 left-3.5 z-1000 flex size-12 items-center justify-center rounded-full bg-white shadow-[0_4px_14px_rgba(29,36,32,.18)]"
+>
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1D2420" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <path d="M15 6l-6 6 6 6"></path>
+  </svg>
+</a>
+
+@if (bache()) {
+  <button
+    type="button"
+    aria-label="Compartir"
+    class="absolute top-3.5 right-3.5 z-1000 flex size-12 cursor-pointer items-center justify-center rounded-full border-0 bg-white shadow-[0_4px_14px_rgba(29,36,32,.18)]"
+    (click)="compartir()"
+  >
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1D2420" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M12 3v12M7 8l5-5 5 5M5 14v5a2 2 0 002 2h10a2 2 0 002-2v-5"></path>
+    </svg>
+  </button>
+}
+
+@if (aviso()) {
+  <div class="pointer-events-none absolute top-[76px] left-1/2 z-1000 w-[min(360px,calc(100%-32px))] -translate-x-1/2 rounded-2xl bg-tinta px-4 py-3 text-center text-[13px] font-medium text-white shadow-[0_4px_16px_rgba(29,36,32,.18)] md:left-[calc(400px+24px)] md:translate-x-0">
+    {{ aviso() }}
+  </div>
+}
+
+<!-- En celular, panel inferior (el punto queda visible arriba); en pantallas anchas, columna a la izquierda. -->
+<section
+  class="absolute inset-x-0 bottom-0 z-1000 box-border flex h-[493px] max-h-[calc(100dvh-80px)] flex-col gap-4 overflow-y-auto rounded-t-3xl bg-white px-5 py-6 text-tinta shadow-[0_-6px_24px_rgba(29,36,32,.14)] md:inset-x-auto md:top-[76px] md:bottom-3 md:left-3 md:h-auto md:max-h-none md:w-[400px] md:rounded-3xl"
+>
+  @if (bache(); as b) {
+    <div class="flex flex-col gap-2.5">
+      <div class="flex items-center gap-2">
+        @if (nivel(); as n) {
+          <span class="flex h-7 items-center gap-[7px] rounded-[14px] pr-3 pl-2.5 text-[13px] font-bold" [style.background]="n.fondo" [style.color]="n.texto">
+            <!-- Tres barras: se llenan tantas como el nivel. -->
+            <span aria-hidden="true" class="flex items-end gap-0.5">
+              <span class="h-1.5 w-1 rounded-[1px]" [style.background]="n.texto"></span>
+              <span class="h-[9px] w-1 rounded-[1px]" [style.background]="n.texto" [style.opacity]="n.nivel >= 2 ? 1 : 0.25"></span>
+              <span class="h-3 w-1 rounded-[1px]" [style.background]="n.texto" [style.opacity]="n.nivel >= 3 ? 1 : 0.25"></span>
+            </span>
+            {{ n.etiqueta }}
+          </span>
+        }
+        <span class="flex h-7 items-center rounded-[14px] bg-superficie px-3 text-[13px] font-medium text-icono">{{ etiquetaEstado() }}</span>
+      </div>
+      <h1 class="m-0 font-sans text-[26px] leading-[1.15] font-bold tracking-[-0.02em]">{{ direccion() }}</h1>
+      @if (b.barrio) {
+        <p class="m-0 text-[15px] text-apagado">{{ b.barrio }}</p>
+      }
+    </div>
+
+    @if (urlFoto(); as foto) {
+      <img [src]="foto" alt="Foto del bache" class="h-[191px] w-full shrink-0 rounded-2xl bg-superficie object-cover" />
+    } @else {
+      <div class="flex h-[191px] shrink-0 flex-col items-center justify-center gap-1.5 rounded-2xl bg-superficie text-apagado">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#5E655F" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <rect x="3" y="5" width="18" height="14" rx="2"></rect>
+          <circle cx="9" cy="10" r="1.6"></circle>
+          <path d="M21 16l-5-5-8 8"></path>
+        </svg>
+        <span class="text-[13px]">Este reporte no tiene foto</span>
+      </div>
+    }
+
+    <div class="grid grid-cols-2 gap-3">
+      <div class="flex min-w-0 flex-col gap-0.5">
+        <span class="text-xs text-apagado">Reportado</span>
+        <span class="truncate text-[15px] font-medium">{{ reportado() }}</span>
+      </div>
+      <div class="flex min-w-0 flex-col gap-0.5">
+        <span class="text-xs text-apagado">Confirmaciones</span>
+        <span class="text-[15px] font-medium">{{ textoConfirmaciones() }}</span>
+        @if (confirmaciones()?.arreglado; as arreglados) {
+          <span class="text-xs text-apagado">{{ arreglados === 1 ? '1 avisó' : arreglados + ' avisaron' }} que ya está arreglado</span>
+        }
+      </div>
+    </div>
+
+    @if (b.estado !== 'reparado') {
+      <div class="mt-auto flex flex-col gap-2.5">
+        <p class="m-0 text-[13px] text-apagado">
+          @switch (confirmaciones()?.miRespuesta) {
+            @case ('sigue') { Marcaste que sigue ahí. Podés cambiar tu respuesta. }
+            @case ('arreglado') { Avisaste que ya lo arreglaron. Podés cambiar tu respuesta. }
+            @default { ¿Pasaste por acá? Ayudá a mantener el mapa al día. }
+          }
+        </p>
+        <div class="grid grid-cols-2 gap-2.5">
+          <button
+            type="button"
+            class="flex h-[52px] cursor-pointer items-center justify-center gap-2 rounded-[14px] border-0 bg-verde text-[15px] font-bold text-white hover:bg-verde-oscuro disabled:cursor-not-allowed disabled:opacity-60"
+            [class]="confirmaciones()?.miRespuesta === 'sigue' ? 'ring-4 ring-verde/30' : ''"
+            [attr.aria-pressed]="confirmaciones()?.miRespuesta === 'sigue'"
+            [disabled]="enviando() || !confirmaciones()"
+            (click)="responder('sigue')"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M5 12l5 5 9-10"></path>
+            </svg>
+            Sigue ahí
+          </button>
+          <button
+            type="button"
+            class="flex h-[52px] cursor-pointer items-center justify-center gap-2 rounded-[14px] border-[1.5px] border-solid bg-white text-[15px] font-bold text-tinta disabled:cursor-not-allowed disabled:opacity-60"
+            [class]="confirmaciones()?.miRespuesta === 'arreglado' ? 'border-tinta bg-superficie' : 'border-[#CFCBC1]'"
+            [attr.aria-pressed]="confirmaciones()?.miRespuesta === 'arreglado'"
+            [disabled]="enviando() || !confirmaciones()"
+            (click)="responder('arreglado')"
+          >
+            Ya lo arreglaron
+          </button>
+        </div>
+      </div>
+    }
+  } @else if (noEncontrado()) {
+    <div class="flex flex-1 flex-col items-center justify-center gap-3 text-center">
+      <h1 class="m-0 font-sans text-[22px] font-bold">No encontramos este bache</h1>
+      <p class="m-0 text-[15px] text-apagado">Puede que lo hayan eliminado o que todavía no esté aprobado.</p>
+      <a routerLink="/" class="mt-2 font-bold text-verde">Volver al mapa</a>
+    </div>
+  } @else {
+    <p class="m-0 text-[15px] text-apagado">Cargando…</p>
+  }
+</section>

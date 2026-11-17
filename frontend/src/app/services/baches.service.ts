@@ -3,7 +3,16 @@ import { Injectable, inject, signal } from '@angular/core';
 import { Observable, tap } from 'rxjs';
 import { map } from 'rxjs/operators';
 import { environment } from '../../environments/environment';
-import { Bache, BacheDto, Direccion, EstadoBache, NuevoBache } from '../models/bache.model';
+import {
+  Bache,
+  BacheDto,
+  Direccion,
+  EstadoBache,
+  NuevoBache,
+  ResumenConfirmaciones,
+  ResumenConfirmacionesDispositivo,
+  TipoConfirmacion,
+} from '../models/bache.model';
 
 @Injectable({ providedIn: 'root' })
 export class BachesService {
@@ -12,6 +21,9 @@ export class BachesService {
 
   private readonly _baches = signal<Bache[]>([]);
   readonly baches = this._baches.asReadonly();
+  /** true después de la primera carga: distingue "todavía no llegó" de "no existe". */
+  private readonly _cargado = signal(false);
+  readonly cargado = this._cargado.asReadonly();
 
   private aBache(dto: BacheDto): Bache {
     return { ...dto, fecha: new Date(dto.fecha) };
@@ -21,7 +33,10 @@ export class BachesService {
   cargar(): Observable<Bache[]> {
     return this.http.get<BacheDto[]>(this.baseUrl).pipe(
       map((dtos) => dtos.map((dto) => this.aBache(dto))),
-      tap((baches) => this._baches.set(baches)),
+      tap((baches) => {
+        this._baches.set(baches);
+        this._cargado.set(true);
+      }),
     );
   }
 
@@ -79,6 +94,25 @@ export class BachesService {
     return this.http.delete<void>(`${this.baseUrl}/${id}`).pipe(
       tap(() => this._baches.update((baches) => baches.filter((bache) => bache.id !== id))),
     );
+  }
+
+  confirmaciones(id: string, dispositivo: string): Observable<ResumenConfirmacionesDispositivo> {
+    return this.http.get<ResumenConfirmacionesDispositivo>(`${this.baseUrl}/${id}/confirmaciones`, {
+      params: { dispositivo },
+    });
+  }
+
+  /** "Sigue ahí" / "Ya lo arreglaron": una respuesta por dispositivo; responder de nuevo la reemplaza. */
+  confirmar(id: string, tipo: TipoConfirmacion, dispositivo: string): Observable<ResumenConfirmacionesDispositivo> {
+    return this.http.post<ResumenConfirmacionesDispositivo>(`${this.baseUrl}/${id}/confirmaciones`, {
+      tipo,
+      dispositivo,
+    });
+  }
+
+  /** Admin: conteos por id de bache (solo los que tienen alguna respuesta). */
+  resumenConfirmaciones(): Observable<Record<string, ResumenConfirmaciones>> {
+    return this.http.get<Record<string, ResumenConfirmaciones>>(`${this.baseUrl}/confirmaciones/resumen`);
   }
 
   urlFoto(fotoUrl: string | null): string | null {
