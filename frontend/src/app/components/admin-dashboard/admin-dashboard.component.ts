@@ -2,7 +2,8 @@
 //
 // Pantalla de entrada del administrador: contadores (pendientes, aprobados,
 // total cargado y aprobados por estado) y la lista completa de puntos
-// (aprobados + pendientes) con filtro, búsqueda y opción de eliminar.
+// (aprobados + pendientes) con filtro, búsqueda y opción de eliminar. Abajo,
+// los mensajes que llegan desde el formulario de "Acerca de".
 //
 // Detrás de authGuard en app.routes.ts: sin sesión válida, redirige a /admin/login.
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
@@ -10,6 +11,7 @@ import { Router, RouterLink } from '@angular/router';
 import { forkJoin } from 'rxjs';
 import { AuthService } from '../../services/auth.service';
 import { BachesService } from '../../services/baches.service';
+import { ContactoService, MensajeContacto } from '../../services/contacto.service';
 import {
   Bache,
   COLOR_REPARADO,
@@ -32,6 +34,7 @@ export class AdminDashboardComponent implements OnInit {
   private readonly bachesService = inject(BachesService);
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
+  private readonly contacto = inject(ContactoService);
 
   protected readonly estados = ESTADOS_BACHE;
   protected readonly filtros: { valor: FiltroRevision; etiqueta: string }[] = [
@@ -48,6 +51,10 @@ export class AdminDashboardComponent implements OnInit {
   protected readonly enProceso = signal<Set<string>>(new Set());
   protected readonly filtro = signal<FiltroRevision>('todos');
   protected readonly busqueda = signal('');
+
+  protected readonly mensajes = signal<MensajeContacto[]>([]);
+  protected readonly cargandoMensajes = signal(true);
+  protected readonly errorMensajes = signal<string | null>(null);
 
   protected readonly pendientes = computed(() => this.baches().filter((b) => !b.revisado).length);
   protected readonly aprobados = computed(() => this.baches().filter((b) => b.revisado).length);
@@ -72,6 +79,39 @@ export class AdminDashboardComponent implements OnInit {
 
   ngOnInit(): void {
     this.cargar();
+    this.cargarMensajes();
+  }
+
+  /** Aparte de los baches: si falla, el resto del panel sigue funcionando. */
+  protected cargarMensajes(): void {
+    this.cargandoMensajes.set(true);
+    this.errorMensajes.set(null);
+    this.contacto.listar().subscribe({
+      next: (mensajes) => {
+        this.mensajes.set(mensajes);
+        this.cargandoMensajes.set(false);
+      },
+      error: () => {
+        this.errorMensajes.set('No se pudieron cargar los mensajes.');
+        this.cargandoMensajes.set(false);
+      },
+    });
+  }
+
+  protected eliminarMensaje(mensaje: MensajeContacto): void {
+    if (!confirm(`¿Eliminar el mensaje de ${mensaje.nombre}? No se puede deshacer.`)) return;
+
+    this.marcarEnProceso(mensaje.id, true);
+    this.contacto.eliminar(mensaje.id).subscribe({
+      next: () => {
+        this.mensajes.update((lista) => lista.filter((m) => m.id !== mensaje.id));
+        this.marcarEnProceso(mensaje.id, false);
+      },
+      error: () => {
+        this.marcarEnProceso(mensaje.id, false);
+        this.errorMensajes.set('No se pudo eliminar el mensaje. Intentá de nuevo.');
+      },
+    });
   }
 
   protected cargar(): void {

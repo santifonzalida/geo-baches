@@ -22,7 +22,9 @@ import {
 import { HttpErrorResponse } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
 import { DecimalPipe } from '@angular/common';
-import { Router, RouterOutlet } from '@angular/router';
+import { NavigationEnd, Router, RouterOutlet } from '@angular/router';
+import { toSignal } from '@angular/core/rxjs-interop';
+import { filter, map } from 'rxjs';
 import * as L from 'leaflet';
 import { BacheSeleccionadoService } from '../../services/bache-seleccionado.service';
 import { BachesService } from '../../services/baches.service';
@@ -53,9 +55,8 @@ const ALTURA_DETALLE = 493;
 const ANCHO_COLUMNA = 400 + 12;
 /** Desde este ancho (md de Tailwind) los paneles van en una columna a la izquierda. */
 const ANCHO_ESCRITORIO = 768;
-/** Formulario de reporte en celular: abierto (sin pasar de alto - margen) y plegado, como en el diseño. */
-const ALTURA_FORM_ABIERTO = 580;
-const ALTURA_FORM_CERRADO = 190;
+/** Alto del formulario de reporte en celular (sin dejar menos de MAPA_MINIMO_CON_FORM de mapa). */
+const ALTURA_FORM = 580;
 const MAPA_MINIMO_CON_FORM = 180;
 /** La punta del pin está 46 px por debajo de su borde superior (ver template). */
 const ALTO_PIN = 46;
@@ -103,8 +104,18 @@ export class MapaComponent implements AfterViewInit, OnDestroy {
   protected readonly busqueda = signal('');
 
   protected readonly hojaAbierta = signal(true);
-  /** Hay un detalle abierto (/bache/:id): se esconden la barra, la lista y los botones flotantes. */
-  protected readonly detalleAbierto = computed(() => this.seleccionado.id() !== null);
+  /** Ruta actual: las rutas hijas (/bache/:id, /acerca) abren un panel encima del mapa. */
+  private readonly url = toSignal(
+    this.router.events.pipe(
+      filter((e): e is NavigationEnd => e instanceof NavigationEnd),
+      map((e) => e.urlAfterRedirects),
+    ),
+    { initialValue: this.router.url },
+  );
+  /** Hay un panel abierto (detalle o "Acerca de"): se esconden la barra, la lista y los botones flotantes. */
+  protected readonly panelAbierto = computed(
+    () => this.seleccionado.id() !== null || this.url().startsWith('/acerca'),
+  );
   /** Lo que se ve del mapa; null hasta que el mapa existe. */
   private readonly limites = signal<L.LatLngBounds | null>(null);
 
@@ -131,8 +142,6 @@ export class MapaComponent implements AfterViewInit, OnDestroy {
   protected readonly nivelReporte = signal<SeveridadBache>('media');
   /** El punto bajo el pin: el que se va a reportar. */
   protected readonly punto = signal<L.LatLng | null>(null);
-  /** Formulario abierto o plegado (solo en celular; en pantallas anchas es una columna). */
-  protected readonly formularioAbierto = signal(true);
   protected readonly editandoDireccion = signal(false);
   protected readonly fotoPreview = signal<string | null>(null);
   protected readonly guardando = signal(false);
@@ -149,9 +158,7 @@ export class MapaComponent implements AfterViewInit, OnDestroy {
   );
 
   protected readonly alturaFormulario = computed(() =>
-    this.formularioAbierto()
-      ? Math.min(ALTURA_FORM_ABIERTO, this.tamano().alto - MAPA_MINIMO_CON_FORM)
-      : ALTURA_FORM_CERRADO,
+    Math.min(ALTURA_FORM, this.tamano().alto - MAPA_MINIMO_CON_FORM),
   );
 
   /** Punta del pin, en px del mapa: centrada en lo que el formulario no tapa (corrida para que el pin entero quede al medio). */
@@ -287,8 +294,7 @@ export class MapaComponent implements AfterViewInit, OnDestroy {
   }
 
   protected mostrarAcercaDe(): void {
-    // Pendiente: pantalla con información del sitio.
-    this.mostrarAviso('Muy pronto vas a encontrar acá información sobre GeoBaches.');
+    this.router.navigate(['/acerca']);
   }
 
   private avisarError(texto: string): void {
@@ -344,7 +350,6 @@ export class MapaComponent implements AfterViewInit, OnDestroy {
     this.punto.set(null);
     this.error.set(null);
     this.editandoDireccion.set(false);
-    this.formularioAbierto.set(true);
     this.reportando.set(true);
     // El pin aparece donde corresponde a este estado del formulario: no hay que correr el mapa por eso.
     this.pinAnterior = this.posicionPin();
@@ -353,10 +358,6 @@ export class MapaComponent implements AfterViewInit, OnDestroy {
     const ubicacion = this.marcadorUbicacion?.getLatLng();
     if (ubicacion) this.centrarEn(ubicacion, Math.max(this.map.getZoom(), 17), this.pinAnterior);
     else this.actualizarPunto();
-  }
-
-  protected alternarFormulario(): void {
-    this.formularioAbierto.update((abierto) => !abierto);
   }
 
   /** Mueve el mapa lo mismo que se movió el pin, para que siga apuntando al mismo lugar. */

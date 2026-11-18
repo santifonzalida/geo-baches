@@ -1,7 +1,7 @@
 <div class="relative h-dvh w-full overflow-hidden bg-fondo font-sans text-tinta" [style.--hoja-h]="alturaHoja() + 'px'">
   <div #mapContainer class="h-full w-full"></div>
 
-  @if (!reportando() && !detalleAbierto()) {
+  @if (!reportando() && !panelAbierto()) {
     <app-barra-mapa
       class="absolute top-3 right-3 left-3 z-1000 md:right-auto md:max-w-[calc(100%-24px)]"
       [(estado)]="filtroEstado"
@@ -33,7 +33,7 @@
     </button>
   }
 
-  @if (!detalleAbierto()) {
+  @if (!panelAbierto()) {
   <button
     type="button"
     aria-label="Ir a mi ubicación"
@@ -49,7 +49,7 @@
   </button>
   }
 
-  @if (!detalleAbierto() && (aviso() || (error() && !reportando()))) {
+  @if (!panelAbierto() && (aviso() || (error() && !reportando()))) {
     <div class="pointer-events-none absolute top-[124px] left-1/2 z-1000 w-[min(360px,calc(100%-32px))] -translate-x-1/2 md:left-[calc(400px+24px)] md:translate-x-0">
       @if (aviso()) {
         <div class="rounded-2xl bg-tinta px-4 py-3 text-center text-[13px] font-medium text-white shadow-[0_4px_16px_rgba(29,36,32,.18)]">{{ aviso() }}</div>
@@ -95,37 +95,13 @@
       </svg>
     </button>
 
-    <!-- Formulario: en celular, panel inferior plegable; en pantallas anchas, columna a la izquierda. -->
+    <!-- Formulario: en celular, panel inferior; en pantallas anchas, columna a la izquierda. -->
     <section
       aria-labelledby="titulo-reporte"
       class="absolute inset-x-0 bottom-0 z-1000 flex h-(--form-h) flex-col overflow-hidden rounded-t-3xl bg-white shadow-[0_-6px_24px_rgba(29,36,32,.14)] transition-[height] duration-250 ease-in-out md:inset-x-auto md:top-3 md:bottom-3 md:left-3 md:h-auto md:w-[400px] md:rounded-3xl"
       [style.--form-h]="alturaFormulario() + 'px'"
     >
-      <div class="flex shrink-0 flex-col gap-3.5 px-5 pt-1.5 md:pt-5">
-        <button
-          type="button"
-          class="flex h-8 w-16 shrink-0 cursor-pointer items-center justify-center self-center rounded-2xl border-0 bg-superficie p-0 md:hidden"
-          [attr.aria-expanded]="formularioAbierto()"
-          [attr.aria-label]="formularioAbierto() ? 'Ocultar formulario' : 'Mostrar formulario'"
-          (click)="alternarFormulario()"
-        >
-          <svg
-            width="22"
-            height="22"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="#3B413D"
-            stroke-width="2.4"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            aria-hidden="true"
-            class="transition-transform duration-250 ease-in-out"
-            [class.rotate-180]="!formularioAbierto()"
-          >
-            <path d="M6 9l6 6 6-6"></path>
-          </svg>
-        </button>
-
+      <div class="flex shrink-0 flex-col gap-3.5 px-5 pt-5">
         <h1 id="titulo-reporte" class="m-0 font-sans text-[22px] font-bold tracking-[-0.01em]">Nuevo reporte</h1>
 
         <div class="flex items-center gap-2.5 rounded-[14px] bg-superficie px-3.5 py-3">
@@ -150,17 +126,16 @@
             class="shrink-0 cursor-pointer rounded-lg border-0 bg-transparent px-1.5 py-1 text-[13px] font-bold text-verde disabled:cursor-default disabled:opacity-40"
             [attr.aria-expanded]="editandoDireccion()"
             [disabled]="!punto() || buscandoDireccion()"
-            (click)="editandoDireccion.set(!editandoDireccion()); formularioAbierto.set(true)"
+            (click)="editandoDireccion.set(!editandoDireccion())"
           >
             {{ editandoDireccion() ? 'Listo' : 'Corregir' }}
           </button>
         </div>
       </div>
 
-      <!-- Plegado (celular) solo se ve el encabezado con la dirección, como en el diseño. -->
       <form
         (ngSubmit)="guardarBache()"
-        class="flex min-h-0 flex-1 flex-col {{ formularioAbierto() ? '' : 'max-md:hidden' }}"
+        class="flex min-h-0 flex-1 flex-col"
       >
         <div class="flex min-h-0 flex-1 flex-col gap-3.5 overflow-y-auto px-5 pt-3.5 pb-1">
           @if (editandoDireccion()) {

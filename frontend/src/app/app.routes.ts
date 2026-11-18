@@ -15,6 +15,10 @@ export const routes: Routes = [
         loadComponent: () =>
           import('./components/detalle-bache/detalle-bache.component').then((m) => m.DetalleBacheComponent),
       },
+      {
+        path: 'acerca',
+        loadComponent: () => import('./components/acerca-de/acerca-de.component').then((m) => m.AcercaDeComponent),
+      },
     ],
   },
   { path: 'admin/login', component: LoginComponent },

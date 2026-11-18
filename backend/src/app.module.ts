@@ -11,6 +11,8 @@ import { AuthModule } from './auth/auth.module';
 import { UsuariosModule } from './usuarios/usuarios.module';
 import { Usuario } from './usuarios/entities/usuario.entity';
 import { Rol } from './usuarios/entities/rol.entity';
+import { ContactoModule } from './contacto/contacto.module';
+import { MensajeContacto } from './contacto/entities/mensaje-contacto.entity';
 
 @Module({
   imports: [
@@ -24,7 +26,7 @@ import { Rol } from './usuarios/entities/rol.entity';
         username: config.get<string>('DB_USERNAME'),
         password: config.get<string>('DB_PASSWORD'),
         database: config.get<string>('DB_NAME'),
-        entities: [Bache, Confirmacion, Usuario, Rol],
+        entities: [Bache, Confirmacion, Usuario, Rol, MensajeContacto],
         synchronize: true,
       }),
     }),
@@ -32,6 +34,7 @@ import { Rol } from './usuarios/entities/rol.entity';
     GeocodingModule,
     AuthModule,
     UsuariosModule,
+    ContactoModule,
   ],
   controllers: [AppController],
   providers: [AppService],
