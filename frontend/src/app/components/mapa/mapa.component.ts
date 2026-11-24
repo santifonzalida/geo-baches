@@ -114,7 +114,11 @@ export class MapaComponent implements AfterViewInit, OnDestroy {
   protected readonly nivelSeleccionado = signal<SeveridadBache | null>(null);
   protected readonly busqueda = signal('');
 
-  protected readonly hojaAbierta = signal(true);
+  /** "Reportes recientes": se pliega o abre tocando el encabezado (y arrastrándolo, en celular). */
+  protected readonly panelHoja = new PanelArrastrable(() => ALTURA_HOJA_ABIERTA, {
+    altoMinimizado: ALTURA_HOJA_CERRADA,
+    tocarEnEscritorio: true,
+  });
   /** Ruta actual: las rutas hijas (/bache/:id, /acerca) abren un panel encima del mapa. */
   private readonly url = toSignal(
     this.router.events.pipe(
@@ -165,7 +169,7 @@ export class MapaComponent implements AfterViewInit, OnDestroy {
 
   /** Alto que ocupa el panel inferior: los botones flotantes se acomodan arriba de él. */
   protected readonly alturaHoja = computed(() =>
-    this.reportando() ? 0 : this.hojaAbierta() ? ALTURA_HOJA_ABIERTA : ALTURA_HOJA_CERRADA,
+    this.reportando() ? 0 : this.panelHoja.alto(),
   );
 
   protected readonly alturaFormulario = computed(() =>
@@ -237,7 +241,7 @@ export class MapaComponent implements AfterViewInit, OnDestroy {
     // El zoom del mapa no pasa del último que el mapa base puede servir (más allá, mosaicos con error).
     this.map = L.map(this.mapContainer.nativeElement, { zoomControl: false, maxZoom: capa.options.maxZoom }).setView(
       [-31.4201, -64.1888],
-      13,
+      12,
     );
 
     capa.addTo(this.map);

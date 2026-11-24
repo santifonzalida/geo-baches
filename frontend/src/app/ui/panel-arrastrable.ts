@@ -33,9 +33,23 @@ export class PanelArrastrable {
   private inicio: { y: number; alto: number; puntero: number } | null = null;
   /** El gesto actual ya movió el panel: el click que sigue no tiene que alternarlo. */
   private huboArrastre = false;
+  private altoFijo = false;
+  private readonly tocarEnEscritorio: boolean;
 
-  /** @param altoAbierto alto del panel abierto (puede depender de signals, como el tamaño de la pantalla). */
-  constructor(private readonly altoAbierto: () => number) {
+  /**
+   * @param altoAbierto alto del panel abierto (puede depender de signals, como el tamaño de la pantalla).
+   * @param opciones.altoMinimizado alto fijo minimizado; si no se pasa, se usa el alto del encabezado.
+   * @param opciones.tocarEnEscritorio tocar el encabezado también alterna en escritorio (arrastrar, no).
+   */
+  constructor(
+    private readonly altoAbierto: () => number,
+    { altoMinimizado, tocarEnEscritorio = false }: { altoMinimizado?: number; tocarEnEscritorio?: boolean } = {},
+  ) {
+    this.tocarEnEscritorio = tocarEnEscritorio;
+    if (altoMinimizado !== undefined) {
+      this.altoEncabezado.set(altoMinimizado);
+      this.altoFijo = true;
+    }
     this.altoReposo = computed(() => (this.minimizado() ? this.altoEncabezado() : altoAbierto()));
     this.alto = computed(() => this.arrastre() ?? this.altoReposo());
   }
@@ -47,13 +61,19 @@ export class PanelArrastrable {
     this.inicio = null;
   }
 
+  /** Tocar el encabezado (en escritorio, solo si se pidió `tocarEnEscritorio`). */
   alTocarEncabezado(encabezado: HTMLElement): void {
-    if (esEscritorio()) return;
+    if (esEscritorio() && !this.tocarEnEscritorio) return;
+    this.medir(encabezado);
+    this.alternar();
+  }
+
+  /** Para un botón propio (ej. un chevron), que también funciona en escritorio. */
+  alternar(): void {
     if (this.huboArrastre) {
-      this.huboArrastre = false;
+      this.huboArrastre = false; // el click que sigue a un arrastre no cuenta
       return;
     }
-    this.medir(encabezado);
     this.minimizado.update((minimizado) => !minimizado);
   }
 
@@ -93,7 +113,7 @@ export class PanelArrastrable {
 
   /** Minimizado queda solo el encabezado (su alto depende, por ejemplo, de si la dirección ocupa una o dos líneas). */
   private medir(encabezado: HTMLElement): void {
-    if (encabezado.offsetHeight) this.altoEncabezado.set(encabezado.offsetHeight);
+    if (!this.altoFijo && encabezado.offsetHeight) this.altoEncabezado.set(encabezado.offsetHeight);
   }
 }
 

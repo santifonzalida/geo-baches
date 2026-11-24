@@ -13,17 +13,19 @@
 
     <!-- En celular ocupa el ancho de abajo; en pantallas anchas flota a la izquierda. -->
     <app-hoja-reportes
-      class="absolute inset-x-0 bottom-0 z-1000 block overflow-hidden rounded-t-3xl bg-white shadow-[0_-6px_24px_rgba(29,36,32,.14)] transition-[height] duration-250 ease-in-out md:inset-x-auto md:bottom-3 md:left-3 md:w-[400px] md:rounded-3xl"
+      class="absolute inset-x-0 bottom-0 z-1000 block overflow-hidden rounded-t-3xl bg-white shadow-[0_-6px_24px_rgba(29,36,32,.14)] md:inset-x-auto md:bottom-3 md:left-3 md:w-[400px] md:rounded-3xl"
+      [class]="panelHoja.arrastre() === null ? 'transition-[height] duration-250 ease-in-out' : ''"
       [style.height.px]="alturaHoja()"
       [reportes]="enZona()"
       [subtitulo]="subtituloHoja()"
-      [(abierta)]="hojaAbierta"
+      [panel]="panelHoja"
       (seleccionar)="irAlReporte($event)"
     />
 
     <button
       type="button"
       class="absolute right-4 bottom-[calc(var(--hoja-h)+16px)] z-1000 flex h-[52px] cursor-pointer items-center gap-2 rounded-[26px] border-0 bg-verde pr-5 pl-4 text-[15px] font-bold text-white shadow-[0_6px_18px_rgba(63,110,74,.4)] transition-[bottom] duration-250 ease-in-out hover:bg-verde-oscuro md:bottom-6"
+      [style.transition]="panelHoja.arrastre() !== null ? 'none' : null"
       (click)="abrirReporte()"
     >
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.4" stroke-linecap="round" aria-hidden="true">
@@ -39,6 +41,7 @@
     aria-label="Ir a mi ubicación"
     class="absolute right-4 z-1000 flex size-12 cursor-pointer items-center justify-center rounded-full border-0 bg-white shadow-[0_4px_14px_rgba(29,36,32,.18)] transition-[bottom] duration-250 ease-in-out"
     [class]="reportando() ? 'top-3.5' : 'bottom-[calc(var(--hoja-h)+84px)] md:bottom-[92px]'"
+    [style.transition]="panelHoja.arrastre() !== null ? 'none' : null"
     (click)="irAMiUbicacion()"
   >
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1D2420" stroke-width="2" stroke-linecap="round" aria-hidden="true">

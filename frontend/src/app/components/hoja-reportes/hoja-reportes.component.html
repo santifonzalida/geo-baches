@@ -1,32 +1,25 @@
 <div class="flex h-full flex-col">
-  <div class="flex items-center justify-between gap-3 pt-[18px] pr-4 pb-2 pl-5">
+  <div
+    #encabezado
+    role="button"
+    tabindex="0"
+    [attr.aria-expanded]="!panel().minimizado()"
+    [attr.aria-label]="(panel().minimizado() ? 'Mostrar' : 'Ocultar') + ' reportes recientes'"
+    class="relative flex shrink-0 cursor-grab touch-none items-center gap-3 pt-[18px] pr-5 pb-2 pl-5 select-none active:cursor-grabbing focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-verde md:cursor-pointer md:touch-auto md:select-auto"
+    (pointerdown)="panel().empezarArrastre($event, encabezado)"
+    (pointermove)="panel().arrastrar($event)"
+    (pointerup)="panel().soltar($event)"
+    (pointercancel)="panel().soltar($event)"
+    (click)="panel().alTocarEncabezado(encabezado)"
+    (keydown.enter)="panel().alternar()"
+    (keydown.space)="$event.preventDefault(); panel().alternar()"
+  >
+    <!-- Manija: indica que el panel se puede arrastrar; el encabezado entero es el control. -->
+    <span aria-hidden="true" class="absolute top-2 left-1/2 h-[5px] w-10 -translate-x-1/2 rounded-full bg-[#D6D2C8] md:hidden"></span>
     <div class="flex min-w-0 flex-col gap-0.5">
       <h1 class="m-0 font-sans text-[19px] font-bold tracking-[-0.01em] text-tinta">Reportes recientes</h1>
       <p class="m-0 text-[13px] text-apagado">{{ subtitulo() }}</p>
     </div>
-    <button
-      type="button"
-      class="flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-full border-0 bg-superficie p-0"
-      [attr.aria-expanded]="abierta()"
-      [attr.aria-label]="abierta() ? 'Ocultar reportes recientes' : 'Mostrar reportes recientes'"
-      (click)="abierta.set(!abierta())"
-    >
-      <svg
-        width="22"
-        height="22"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="#3B413D"
-        stroke-width="2.4"
-        stroke-linecap="round"
-        stroke-linejoin="round"
-        aria-hidden="true"
-        class="transition-transform duration-250 ease-in-out"
-        [class.rotate-180]="!abierta()"
-      >
-        <path d="M6 9l6 6 6-6"></path>
-      </svg>
-    </button>
   </div>
 
   <div class="min-h-0 flex-1 overflow-y-auto pb-2">
