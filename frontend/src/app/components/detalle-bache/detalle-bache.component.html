@@ -27,12 +27,35 @@
   </div>
 }
 
-<!-- En celular, panel inferior (el punto queda visible arriba); en pantallas anchas, columna a la izquierda. -->
+<!--
+  En celular, panel inferior (el punto queda visible arriba): el encabezado queda fijo y el
+  resto scrollea. Tocar o arrastrar el encabezado lo minimiza (queda solo el encabezado) o lo
+  vuelve a expandir. En pantallas anchas, columna a la izquierda.
+-->
 <section
-  class="absolute inset-x-0 bottom-0 z-1000 box-border flex h-[493px] max-h-[calc(100dvh-80px)] flex-col gap-4 overflow-y-auto rounded-t-3xl bg-white px-5 py-6 text-tinta shadow-[0_-6px_24px_rgba(29,36,32,.14)] md:inset-x-auto md:top-[76px] md:bottom-3 md:left-3 md:h-auto md:max-h-none md:w-[400px] md:rounded-3xl"
+  class="absolute inset-x-0 bottom-0 z-1000 box-border flex h-(--detalle-h) max-h-[calc(100dvh-80px)] flex-col overflow-hidden rounded-t-3xl bg-white text-tinta shadow-[0_-6px_24px_rgba(29,36,32,.14)] md:inset-x-auto md:top-[76px] md:bottom-3 md:left-3 md:h-auto md:max-h-none md:w-[400px] md:rounded-3xl"
+  [class]="panel.arrastre() === null ? 'transition-[height] duration-250 ease-in-out' : ''"
+  [style.--detalle-h]="panel.alto() + 'px'"
 >
   @if (bache(); as b) {
-    <div class="flex flex-col gap-2.5">
+    <div
+      #encabezado
+      class="flex shrink-0 cursor-grab touch-none flex-col gap-2.5 px-5 pt-2 pb-4 select-none active:cursor-grabbing md:cursor-auto md:touch-auto md:pt-6 md:select-auto"
+      (pointerdown)="panel.empezarArrastre($event, encabezado)"
+      (pointermove)="panel.arrastrar($event)"
+      (pointerup)="panel.soltar($event)"
+      (pointercancel)="panel.soltar($event)"
+      (click)="panel.alTocarEncabezado(encabezado)"
+    >
+      <!-- Manija: indica que se puede arrastrar; con teclado, Enter la alterna. -->
+      <button
+        type="button"
+        class="flex h-5 w-full cursor-pointer items-center justify-center border-0 bg-transparent p-0 md:hidden"
+        [attr.aria-expanded]="!panel.minimizado()"
+        [attr.aria-label]="panel.minimizado() ? 'Expandir detalle' : 'Minimizar detalle'"
+      >
+        <span class="h-[5px] w-10 rounded-full bg-[#D6D2C8]"></span>
+      </button>
       <div class="flex items-center gap-2">
         @if (nivel(); as n) {
           <span class="flex h-7 items-center gap-[7px] rounded-[14px] pr-3 pl-2.5 text-[13px] font-bold" [style.background]="n.fondo" [style.color]="n.texto">
@@ -53,10 +76,11 @@
       }
     </div>
 
+    <div class="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain px-5 pb-6">
     @if (urlFoto(); as foto) {
-      <img [src]="foto" alt="Foto del bache" class="h-[191px] w-full shrink-0 rounded-2xl bg-superficie object-cover" />
+      <img [src]="foto" alt="Foto del bache" class="h-[260px] w-full shrink-0 rounded-2xl bg-superficie object-cover" />
     } @else {
-      <div class="flex h-[191px] shrink-0 flex-col items-center justify-center gap-1.5 rounded-2xl bg-superficie text-apagado">
+      <div class="flex h-[260px] shrink-0 flex-col items-center justify-center gap-1.5 rounded-2xl bg-superficie text-apagado">
         <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#5E655F" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <rect x="3" y="5" width="18" height="14" rx="2"></rect>
           <circle cx="9" cy="10" r="1.6"></circle>
@@ -65,6 +89,10 @@
         <span class="text-[13px]">Este reporte no tiene foto</span>
       </div>
     }
+
+    <!-- Lo aportado por los vecinos: queda al final, se ve al scrollear. -->
+    <div class="flex flex-col gap-4 border-t border-separador pt-5">
+    <h2 class="m-0 font-sans text-[17px] font-bold tracking-normal">Lo que dicen los vecinos</h2>
 
     <div class="grid grid-cols-2 gap-3">
       <div class="flex min-w-0 flex-col gap-0.5">
@@ -81,7 +109,7 @@
     </div>
 
     @if (b.estado !== 'reparado') {
-      <div class="mt-auto flex flex-col gap-2.5">
+      <div class="flex flex-col gap-2.5">
         <p class="m-0 text-[13px] text-apagado">
           @switch (confirmaciones()?.miRespuesta) {
             @case ('sigue') { Marcaste que sigue ahí. Podés cambiar tu respuesta. }
@@ -116,13 +144,15 @@
         </div>
       </div>
     }
+    </div>
+    </div>
   } @else if (noEncontrado()) {
-    <div class="flex flex-1 flex-col items-center justify-center gap-3 text-center">
+    <div class="flex flex-1 flex-col px-5 py-6 items-center justify-center gap-3 text-center">
       <h1 class="m-0 font-sans text-[22px] font-bold">No encontramos este bache</h1>
       <p class="m-0 text-[15px] text-apagado">Puede que lo hayan eliminado o que todavía no esté aprobado.</p>
       <a routerLink="/" class="mt-2 font-bold text-verde">Volver al mapa</a>
     </div>
   } @else {
-    <p class="m-0 text-[15px] text-apagado">Cargando…</p>
+    <p class="m-0 px-5 py-6 text-[15px] text-apagado">Cargando…</p>
   }
 </section>

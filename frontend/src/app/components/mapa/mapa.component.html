@@ -95,13 +95,35 @@
       </svg>
     </button>
 
-    <!-- Formulario: en celular, panel inferior; en pantallas anchas, columna a la izquierda. -->
+    <!--
+      Formulario: en celular, panel inferior; tocar o arrastrar el encabezado lo minimiza (queda
+      el título con la dirección y casi todo el mapa libre) o lo expande. En pantallas anchas,
+      columna a la izquierda.
+    -->
     <section
       aria-labelledby="titulo-reporte"
-      class="absolute inset-x-0 bottom-0 z-1000 flex h-(--form-h) flex-col overflow-hidden rounded-t-3xl bg-white shadow-[0_-6px_24px_rgba(29,36,32,.14)] transition-[height] duration-250 ease-in-out md:inset-x-auto md:top-3 md:bottom-3 md:left-3 md:h-auto md:w-[400px] md:rounded-3xl"
-      [style.--form-h]="alturaFormulario() + 'px'"
+      class="absolute inset-x-0 bottom-0 z-1000 flex h-(--form-h) flex-col overflow-hidden rounded-t-3xl bg-white shadow-[0_-6px_24px_rgba(29,36,32,.14)] md:inset-x-auto md:top-3 md:bottom-3 md:left-3 md:h-auto md:w-[400px] md:rounded-3xl"
+      [class]="panelReporte.arrastre() === null ? 'transition-[height] duration-250 ease-in-out' : ''"
+      [style.--form-h]="panelReporte.alto() + 'px'"
     >
-      <div class="flex shrink-0 flex-col gap-3.5 px-5 pt-5">
+      <div
+        #encabezadoReporte
+        class="flex shrink-0 cursor-grab touch-none flex-col gap-3.5 px-5 pt-2 pb-1 select-none active:cursor-grabbing md:cursor-auto md:touch-auto md:pt-5 md:pb-0 md:select-auto"
+        (pointerdown)="panelReporte.empezarArrastre($event, encabezadoReporte)"
+        (pointermove)="panelReporte.arrastrar($event)"
+        (pointerup)="panelReporte.soltar($event)"
+        (pointercancel)="panelReporte.soltar($event)"
+        (click)="panelReporte.alTocarEncabezado(encabezadoReporte)"
+      >
+        <!-- Manija: indica que se puede arrastrar; con teclado, Enter la alterna. -->
+        <button
+          type="button"
+          class="-mb-1.5 flex h-5 w-full cursor-pointer items-center justify-center border-0 bg-transparent p-0 md:hidden"
+          [attr.aria-expanded]="!panelReporte.minimizado()"
+          [attr.aria-label]="panelReporte.minimizado() ? 'Expandir formulario' : 'Minimizar formulario'"
+        >
+          <span class="h-[5px] w-10 rounded-full bg-[#D6D2C8]"></span>
+        </button>
         <h1 id="titulo-reporte" class="m-0 font-sans text-[22px] font-bold tracking-[-0.01em]">Nuevo reporte</h1>
 
         <div class="flex items-center gap-2.5 rounded-[14px] bg-superficie px-3.5 py-3">
@@ -126,7 +148,7 @@
             class="shrink-0 cursor-pointer rounded-lg border-0 bg-transparent px-1.5 py-1 text-[13px] font-bold text-verde disabled:cursor-default disabled:opacity-40"
             [attr.aria-expanded]="editandoDireccion()"
             [disabled]="!punto() || buscandoDireccion()"
-            (click)="editandoDireccion.set(!editandoDireccion())"
+            (click)="$event.stopPropagation(); editandoDireccion.set(!editandoDireccion()); panelReporte.abrir()"
           >
             {{ editandoDireccion() ? 'Listo' : 'Corregir' }}
           </button>

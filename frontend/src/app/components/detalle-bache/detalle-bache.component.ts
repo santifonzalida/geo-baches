@@ -19,6 +19,10 @@ import {
 import { BacheSeleccionadoService } from '../../services/bache-seleccionado.service';
 import { BachesService } from '../../services/baches.service';
 import { DispositivoService } from '../../services/dispositivo.service';
+import { PanelArrastrable } from '../../ui/panel-arrastrable';
+
+/** Alto del panel abierto en celular: igual que ALTURA_DETALLE en mapa.component.ts. */
+const ALTO_ABIERTO = 493;
 
 @Component({
   selector: 'app-detalle-bache',
@@ -56,6 +60,9 @@ export class DetalleBacheComponent implements OnDestroy {
   });
   protected readonly urlFoto = computed(() => this.bachesService.urlFoto(this.bache()?.fotoUrl ?? null));
 
+  /** Celular: tocar o arrastrar el encabezado minimiza / expande el panel. */
+  protected readonly panel = new PanelArrastrable(() => ALTO_ABIERTO);
+
   protected readonly confirmaciones = signal<ResumenConfirmacionesDispositivo | null>(null);
   protected readonly enviando = signal(false);
   protected readonly aviso = signal<string | null>(null);
@@ -73,6 +80,7 @@ export class DetalleBacheComponent implements OnDestroy {
     effect(() => {
       const id = this.id();
       this.confirmaciones.set(null);
+      this.panel.abrir(); // otro bache: el panel vuelve a abrirse
       if (!id) return;
       this.bachesService.confirmaciones(id, this.dispositivo.id).subscribe({
         next: (resumen) => this.confirmaciones.set(resumen),

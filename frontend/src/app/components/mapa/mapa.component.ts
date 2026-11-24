@@ -41,6 +41,7 @@ import {
 } from '../../models/bache.model';
 import { BarraMapaComponent } from '../barra-mapa/barra-mapa.component';
 import { HojaReportesComponent } from '../hoja-reportes/hoja-reportes.component';
+import { PanelArrastrable } from '../../ui/panel-arrastrable';
 import { environment } from '../../../environments/environment';
 
 /** Debe coincidir con el límite del backend (baches.controller.ts). */
@@ -57,7 +58,7 @@ const ANCHO_COLUMNA = 400 + 12;
 /** Desde este ancho (md de Tailwind) los paneles van en una columna a la izquierda. */
 const ANCHO_ESCRITORIO = 768;
 /** Alto del formulario de reporte en celular (sin dejar menos de MAPA_MINIMO_CON_FORM de mapa). */
-const ALTURA_FORM = 580;
+const ALTURA_FORM = 460;
 const MAPA_MINIMO_CON_FORM = 180;
 /** La punta del pin está 46 px por debajo de su borde superior (ver template). */
 const ALTO_PIN = 46;
@@ -92,6 +93,8 @@ export class MapaComponent implements AfterViewInit, OnDestroy {
   private destacadoId: string | null = null;
   /** Zoom que tenía el mapa antes de abrir el detalle (null si se entró directo por link). */
   private zoomAntesDelDetalle: number | null = null;
+  /** Vista del mapa antes de empezar un reporte: al cerrarlo se vuelve ahí. */
+  private vistaAntesDelReporte: { centro: L.LatLng; zoom: number } | null = null;
   /** Dónde estaba el pin la última vez: si se mueve (se pliega el formulario), el mapa lo acompaña. */
   private pinAnterior: L.Point | null = null;
   private temporizadorGeocodificar: ReturnType<typeof setTimeout> | undefined;
@@ -168,13 +171,15 @@ export class MapaComponent implements AfterViewInit, OnDestroy {
   protected readonly alturaFormulario = computed(() =>
     Math.min(ALTURA_FORM, this.tamano().alto - MAPA_MINIMO_CON_FORM),
   );
+  /** Celular: tocar o arrastrar el encabezado del formulario lo minimiza (deja más mapa para ubicar el punto) o lo expande. */
+  protected readonly panelReporte = new PanelArrastrable(() => this.alturaFormulario());
 
   /** Punta del pin, en px del mapa: centrada en lo que el formulario no tapa (corrida para que el pin entero quede al medio). */
   protected readonly posicionPin = computed(() => {
     const { ancho, alto } = this.tamano();
     return this.esEscritorio()
       ? L.point(ANCHO_COLUMNA + (ancho - ANCHO_COLUMNA) / 2, alto / 2 + ALTO_PIN / 2)
-      : L.point(ancho / 2, (alto - this.alturaFormulario()) / 2 + ALTO_PIN / 2);
+      : L.point(ancho / 2, (alto - this.panelReporte.altoReposo()) / 2 + ALTO_PIN / 2);
   });
 
   /** El cartel va arriba del pin, sin pegarse al borde. */
@@ -384,6 +389,7 @@ export class MapaComponent implements AfterViewInit, OnDestroy {
   // --- Reporte -------------------------------------------------------------
 
   protected abrirReporte(): void {
+    this.vistaAntesDelReporte = { centro: this.map.getCenter(), zoom: this.map.getZoom() };
     this.usuario = this.leerUsuarioGuardado();
     this.calle = '';
     this.altura = '';
@@ -394,6 +400,7 @@ export class MapaComponent implements AfterViewInit, OnDestroy {
     this.punto.set(null);
     this.error.set(null);
     this.editandoDireccion.set(false);
+    this.panelReporte.abrir();
     this.reportando.set(true);
     // El pin aparece donde corresponde a este estado del formulario: no hay que correr el mapa por eso.
     this.pinAnterior = this.posicionPin();
@@ -584,6 +591,11 @@ export class MapaComponent implements AfterViewInit, OnDestroy {
     this.punto.set(null);
     this.fotoPreview.set(null);
     this.buscandoDireccion.set(false);
+
+    // Volver a donde estaba el mapa antes de reportar (para ubicar el punto se suele acercar mucho).
+    const vista = this.vistaAntesDelReporte;
+    this.vistaAntesDelReporte = null;
+    if (vista) this.map.flyTo(vista.centro, vista.zoom, { duration: 0.6 });
   }
 
   // --- Marcadores ----------------------------------------------------------
