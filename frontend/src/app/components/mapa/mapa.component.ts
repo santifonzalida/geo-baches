@@ -41,6 +41,7 @@ import {
 } from '../../models/bache.model';
 import { BarraMapaComponent } from '../barra-mapa/barra-mapa.component';
 import { HojaReportesComponent } from '../hoja-reportes/hoja-reportes.component';
+import { environment } from '../../../environments/environment';
 
 /** Debe coincidir con el límite del backend (baches.controller.ts). */
 const TAMANO_MAX_FOTO = 5 * 1024 * 1024;
@@ -64,6 +65,11 @@ const ALTO_PIN = 46;
 const ESPERA_GEOCODIFICAR = 700;
 /** Con menos zoom que esto el punto es demasiado impreciso: se pide acercar. */
 const ZOOM_PRECISO = 15;
+/** Al cerrar un detalle se aleja al menos hasta acá, para volver a ver los puntos de alrededor. */
+const ZOOM_VISTA_GENERAL = 14;
+/** Último zoom que sirve cada mapa base: CARTO responde 403 desde el 19 y OpenStreetMap llega a 19. */
+const ZOOM_MAXIMO_CARTO = 18;
+const ZOOM_MAXIMO_OSM = 19;
 const CLAVE_USUARIO = 'geobaches-usuario';
 
 @Component({
@@ -84,6 +90,8 @@ export class MapaComponent implements AfterViewInit, OnDestroy {
   private marcadorUbicacion: L.Marker | undefined;
   /** Id del marcador que hoy tiene el ícono destacado. */
   private destacadoId: string | null = null;
+  /** Zoom que tenía el mapa antes de abrir el detalle (null si se entró directo por link). */
+  private zoomAntesDelDetalle: number | null = null;
   /** Dónde estaba el pin la última vez: si se mueve (se pliega el formulario), el mapa lo acompaña. */
   private pinAnterior: L.Point | null = null;
   private temporizadorGeocodificar: ReturnType<typeof setTimeout> | undefined;
@@ -220,15 +228,14 @@ export class MapaComponent implements AfterViewInit, OnDestroy {
 
   private initMap(): void {
     // Centrado en Córdoba como ejemplo, ajustá a tu zona
-    this.map = L.map(this.mapContainer.nativeElement, { zoomControl: false }).setView(
+    const capa = this.capaBase();
+    // El zoom del mapa no pasa del último que el mapa base puede servir (más allá, mosaicos con error).
+    this.map = L.map(this.mapContainer.nativeElement, { zoomControl: false, maxZoom: capa.options.maxZoom }).setView(
       [-31.4201, -64.1888],
       13,
     );
 
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-      maxZoom: 19,
-    }).addTo(this.map);
+    capa.addTo(this.map);
 
     this.limites.set(this.map.getBounds());
     this.zoom.set(this.map.getZoom());
@@ -245,6 +252,24 @@ export class MapaComponent implements AfterViewInit, OnDestroy {
         this.centrarEn(e.latlng, Math.max(this.map.getZoom(), ZOOM_PRECISO + 2), this.posicionPin());
       }
     });
+  }
+
+  /**
+   * Mapa base CARTO Positron: claro y apagado, para que resalten los marcadores de colores.
+   * CARTO pide una clave en cada mosaico (sin ella los sirve con una marca de agua), así que
+   * sin clave configurada se usa el mapa estándar de OpenStreetMap.
+   */
+  private capaBase(): L.TileLayer {
+    const osm = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
+    const clave = environment.cartoApiKey;
+    if (!clave) {
+      return L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: ZOOM_MAXIMO_OSM, attribution: osm });
+    }
+    // {r} pide mosaicos @2x en pantallas de alta densidad.
+    return L.tileLayer(
+      `https://basemaps.cartocdn.com/rastertiles/light_all/{z}/{x}/{y}{r}.png?key=${encodeURIComponent(clave)}`,
+      { maxZoom: ZOOM_MAXIMO_CARTO, attribution: `${osm} &copy; <a href="https://carto.com/attributions">CARTO</a>` },
+    );
   }
 
   private cargarBachesExistentes(): void {
@@ -310,16 +335,20 @@ export class MapaComponent implements AfterViewInit, OnDestroy {
   private destacar(bache: Bache | null): void {
     if (!this.map) return;
 
-    if (this.destacadoId && this.destacadoId !== bache?.id) {
-      const anterior = this.baches().find((b) => b.id === this.destacadoId);
-      const marker = this.marcadores.get(this.destacadoId);
-      if (anterior && marker) marker.setIcon(this.crearIcono(anterior)).setZIndexOffset(0);
+    const anterior = this.destacadoId ? this.baches().find((b) => b.id === this.destacadoId) : undefined;
+    if (anterior && anterior.id !== bache?.id) {
+      this.marcadores.get(anterior.id)?.setIcon(this.crearIcono(anterior)).setZIndexOffset(0);
     }
+    // Se abre un detalle desde el mapa: recordar el zoom para el regreso.
+    if (bache && !this.destacadoId) this.zoomAntesDelDetalle = this.map.getZoom();
     this.destacadoId = bache?.id ?? null;
 
     this.marcadores.forEach((marker, id) => marker.setOpacity(!bache || id === bache.id ? 1 : 0.45));
     this.sincronizarMarcadores(this.visibles());
-    if (!bache) return;
+    if (!bache) {
+      if (anterior) this.alejarAlCerrar(anterior);
+      return;
+    }
 
     this.marcadores.get(bache.id)?.setIcon(this.crearIcono(bache, true)).setZIndexOffset(1000);
     // En el centro de lo que el panel de detalle no tapa.
@@ -328,6 +357,21 @@ export class MapaComponent implements AfterViewInit, OnDestroy {
       ? L.point(ANCHO_COLUMNA + (ancho - ANCHO_COLUMNA) / 2, alto / 2)
       : L.point(ancho / 2, (alto - ALTURA_DETALLE) / 2);
     this.centrarEn(L.latLng(bache.lat, bache.lng), Math.max(this.map.getZoom(), 16), destino);
+  }
+
+  /**
+   * Al volver al mapa: alejar para ver los puntos de alrededor (a la vista general, o más
+   * lejos si así estaba antes de abrir el detalle), con el bache recién visto en el centro
+   * de lo que el panel "Reportes recientes" no tapa.
+   */
+  private alejarAlCerrar(bache: Bache): void {
+    const zoom = Math.min(this.zoomAntesDelDetalle ?? ZOOM_VISTA_GENERAL, ZOOM_VISTA_GENERAL);
+    this.zoomAntesDelDetalle = null;
+    const { ancho, alto } = this.tamano();
+    const destino = this.esEscritorio()
+      ? L.point(ancho / 2, alto / 2)
+      : L.point(ancho / 2, (alto - this.alturaHoja()) / 2);
+    this.centrarEn(L.latLng(bache.lat, bache.lng), zoom, destino);
   }
 
   /** flyTo, pero dejando `punto` en el lugar `destino` (px del contenedor) en vez de en el centro. */
