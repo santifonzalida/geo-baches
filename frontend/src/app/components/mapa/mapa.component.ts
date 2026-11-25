@@ -32,8 +32,8 @@ import {
   Bache,
   COLOR_REPARADO,
   cumpleFiltros,
-  ESTADOS_BACHE,
-  EstadoBache,
+  FILTROS_ESTADO,
+  FiltroEstado,
   formatearDireccion,
   nivelDe,
   SeveridadBache,
@@ -110,7 +110,7 @@ export class MapaComponent implements AfterViewInit, OnDestroy {
   protected readonly baches = this.bachesService.baches;
 
   // Filtros de la barra
-  protected readonly filtroEstado = signal<EstadoBache>('reportado');
+  protected readonly filtroEstado = signal<FiltroEstado>('reportado');
   protected readonly nivelSeleccionado = signal<SeveridadBache | null>(null);
   protected readonly busqueda = signal('');
 
@@ -148,8 +148,10 @@ export class MapaComponent implements AfterViewInit, OnDestroy {
   });
 
   protected readonly subtituloHoja = computed(() => {
-    const estado = ESTADOS_BACHE.find((e) => e.valor === this.filtroEstado());
-    return `${this.enZona().length} ${estado?.filtro.toLowerCase()} en esta zona`;
+    const cantidad = this.enZona().length;
+    if (this.filtroEstado() === 'todos') return `${cantidad} ${cantidad === 1 ? 'reporte' : 'reportes'} en esta zona`;
+    const estado = FILTROS_ESTADO.find((e) => e.valor === this.filtroEstado());
+    return `${cantidad} ${estado?.filtro.toLowerCase()} en esta zona`;
   });
 
   // Reporte
@@ -619,7 +621,7 @@ export class MapaComponent implements AfterViewInit, OnDestroy {
   /**
    * Círculo con el número de nivel (1/2/3) y el color del diseño. "En obra" suma una
    * insignia con una llave; "arreglado" pasa a verde con un tilde en lugar del número.
-   * Destacado (el del detalle abierto): más grande y con un halo del mismo color.
+   * Destacado (el del detalle abierto): más grande y con un anillo pulsante del mismo color.
    */
   private crearIcono(bache: Bache, destacado = false): L.DivIcon {
     const tamano = destacado ? 40 : 32;
@@ -636,12 +638,13 @@ export class MapaComponent implements AfterViewInit, OnDestroy {
         : '';
 
     const circulo = `<span style="position:relative;width:${tamano}px;height:${tamano}px;border-radius:50%;background:${fondo};border:3px solid #FFFFFF;box-shadow:0 ${destacado ? '3px 10px rgba(0,0,0,.35)' : '2px 6px rgba(0,0,0,.3)'};box-sizing:border-box;color:${tinta};font:700 ${destacado ? 16 : 13}px 'DM Sans',system-ui,sans-serif;display:flex;align-items:center;justify-content:center">${contenido}${insigniaObra}</span>`;
-    // Halo: el color del círculo al 18 % de opacidad (sufijo hex 2E).
-    const halo = 58;
+    // Destacado: un anillo pulsante del color del círculo (.marcador-pulso-fuerte, barrio.css),
+    // sin halo fijo de fondo. El contenedor de 58 px es la base de la que crece el anillo.
+    const base = 58;
     const html = destacado
-      ? `<span style="width:${halo}px;height:${halo}px;border-radius:50%;background:${fondo}2E;display:flex;align-items:center;justify-content:center">${circulo}</span>`
+      ? `<span style="position:relative;width:${base}px;height:${base}px;border-radius:50%;display:flex;align-items:center;justify-content:center;--color-marcador:${fondo}"><span class="marcador-pulso-fuerte"></span>${circulo}</span>`
       : circulo;
-    const lado = destacado ? halo : tamano;
+    const lado = destacado ? base : tamano;
 
     return L.divIcon({ className: '', html, iconSize: [lado, lado], iconAnchor: [lado / 2, lado / 2] });
   }

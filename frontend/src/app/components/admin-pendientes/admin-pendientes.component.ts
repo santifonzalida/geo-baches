@@ -18,6 +18,7 @@ import {
 } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import * as L from 'leaflet';
+import { ConfirmacionService } from '../../services/confirmacion.service';
 import { AuthService } from '../../services/auth.service';
 import { BachesService } from '../../services/baches.service';
 import { Bache, formatearDireccion, SEVERIDADES_BACHE } from '../../models/bache.model';
@@ -35,6 +36,7 @@ export class AdminPendientesComponent implements OnInit, AfterViewInit, OnDestro
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
+  private readonly confirmacion = inject(ConfirmacionService);
   private map!: L.Map;
   private marcadorSeleccionado: L.Marker | undefined;
 
@@ -167,8 +169,13 @@ export class AdminPendientesComponent implements OnInit, AfterViewInit, OnDestro
     });
   }
 
-  protected rechazar(bache: Bache): void {
-    if (!confirm('¿Rechazar y eliminar este reporte? No se puede deshacer.')) return;
+  protected async rechazar(bache: Bache): Promise<void> {
+    const confirmado = await this.confirmacion.pedir({
+      titulo: '¿Rechazar este reporte?',
+      mensaje: `Se va a eliminar el reporte de ${formatearDireccion(bache)}; no va a aparecer en el mapa.`,
+      textoConfirmar: 'Rechazar',
+    });
+    if (!confirmado) return;
 
     this.marcarEnProceso(bache.id, true);
     this.bachesService.eliminar(bache.id).subscribe({

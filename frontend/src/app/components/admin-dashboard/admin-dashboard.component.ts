@@ -11,6 +11,7 @@ import { Router, RouterLink } from '@angular/router';
 import { forkJoin } from 'rxjs';
 import { AuthService } from '../../services/auth.service';
 import { BachesService } from '../../services/baches.service';
+import { ConfirmacionService } from '../../services/confirmacion.service';
 import { ContactoService, MensajeContacto } from '../../services/contacto.service';
 import {
   Bache,
@@ -35,6 +36,7 @@ export class AdminDashboardComponent implements OnInit {
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
   private readonly contacto = inject(ContactoService);
+  private readonly confirmacion = inject(ConfirmacionService);
 
   protected readonly estados = ESTADOS_BACHE;
   protected readonly filtros: { valor: FiltroRevision; etiqueta: string }[] = [
@@ -98,8 +100,12 @@ export class AdminDashboardComponent implements OnInit {
     });
   }
 
-  protected eliminarMensaje(mensaje: MensajeContacto): void {
-    if (!confirm(`¿Eliminar el mensaje de ${mensaje.nombre}? No se puede deshacer.`)) return;
+  protected async eliminarMensaje(mensaje: MensajeContacto): Promise<void> {
+    const confirmado = await this.confirmacion.pedir({
+      titulo: '¿Eliminar este mensaje?',
+      mensaje: `Se va a borrar el mensaje de ${mensaje.nombre} (${mensaje.email}).`,
+    });
+    if (!confirmado) return;
 
     this.marcarEnProceso(mensaje.id, true);
     this.contacto.eliminar(mensaje.id).subscribe({
@@ -141,8 +147,12 @@ export class AdminDashboardComponent implements OnInit {
     this.router.navigateByUrl('/admin/login');
   }
 
-  protected eliminar(bache: Bache): void {
-    if (!confirm(`¿Eliminar el bache de ${this.direccion(bache)}? No se puede deshacer.`)) return;
+  protected async eliminar(bache: Bache): Promise<void> {
+    const confirmado = await this.confirmacion.pedir({
+      titulo: '¿Eliminar este bache?',
+      mensaje: `Se va a borrar el reporte de ${this.direccion(bache)}, con su foto y las confirmaciones de los vecinos.`,
+    });
+    if (!confirmado) return;
 
     this.marcarEnProceso(bache.id, true);
     this.bachesService.eliminar(bache.id).subscribe({

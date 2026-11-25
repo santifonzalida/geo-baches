@@ -148,8 +148,20 @@ export function nivelDe(severidad: SeveridadBache): NivelBache {
   return SEVERIDADES_BACHE.find((s) => s.valor === severidad) ?? SEVERIDADES_BACHE[1];
 }
 
+/** Filtro de estado del mapa: uno de los estados, o todos juntos. */
+export type FiltroEstado = EstadoBache | 'todos';
+
+/**
+ * Chips de estado de la pantalla del mapa: "Todos" primero y después los estados.
+ * "En obra" no tiene chip propio: esos baches se ven con "Todos".
+ */
+export const FILTROS_ESTADO: { valor: FiltroEstado; filtro: string }[] = [
+  { valor: 'todos', filtro: 'Todos' },
+  ...ESTADOS_BACHE.filter(({ valor }) => valor !== 'en-reparacion').map(({ valor, filtro }) => ({ valor, filtro })),
+];
+
 export interface FiltrosMapa {
-  estado: EstadoBache;
+  estado: FiltroEstado;
   /** null: todos los niveles. */
   nivel: SeveridadBache | null;
   busqueda: string;
@@ -162,7 +174,7 @@ function normalizarTexto(texto: string): string {
 
 /** Si un bache se muestra (en el mapa y en la lista) con los filtros de la pantalla del mapa. */
 export function cumpleFiltros(bache: Bache, filtros: FiltrosMapa): boolean {
-  if (bache.estado !== filtros.estado) return false;
+  if (filtros.estado !== 'todos' && bache.estado !== filtros.estado) return false;
   if (filtros.nivel && bache.severidad !== filtros.nivel) return false;
 
   const texto = normalizarTexto(filtros.busqueda);

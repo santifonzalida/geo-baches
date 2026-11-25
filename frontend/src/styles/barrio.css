@@ -140,3 +140,28 @@ h1, h2, h3, h4, .disp {
   0% { transform: scale(0.4); opacity: 0.45; }
   100% { transform: scale(1); opacity: 0; }
 }
+/*
+ * Variante más visible para el punto elegido en el mapa principal: un anillo más opaco,
+ * con borde, que se expande desde el círculo hasta 80 px (la base mide 58: 58 × 1.38 ≈ 80).
+ */
+.marcador-pulso-fuerte {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 3px solid var(--color-marcador);
+  background: var(--color-marcador);
+  opacity: 0;
+  animation: pulso-mapa-fuerte 1.8s ease-out infinite;
+  pointer-events: none;
+}
+@keyframes pulso-mapa-fuerte {
+  0% { transform: scale(0.55); opacity: 0.7; }
+  70% { opacity: 0.15; }
+  100% { transform: scale(1.38); opacity: 0; }
+}
+
+/* Quien pidió menos movimiento en su sistema ve el anillo quieto. */
+@media (prefers-reduced-motion: reduce) {
+  .marcador-pulso-anillo { animation: none; opacity: 0.2; }
+  .marcador-pulso-fuerte { animation: none; opacity: 0.25; transform: scale(1.15); }
+}

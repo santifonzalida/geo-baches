@@ -34,6 +34,13 @@ describe('cumpleFiltros', () => {
     expect(cumpleFiltros(bache({ estado: 'reparado' }), SIN_FILTROS)).toBe(false);
   });
 
+  it('"todos" muestra cualquier estado', () => {
+    const todos: FiltrosMapa = { ...SIN_FILTROS, estado: 'todos' };
+    expect(cumpleFiltros(bache({ estado: 'reportado' }), todos)).toBe(true);
+    expect(cumpleFiltros(bache({ estado: 'en-reparacion' }), todos)).toBe(true);
+    expect(cumpleFiltros(bache({ estado: 'reparado' }), todos)).toBe(true);
+  });
+
   it('sin nivel elegido muestra todos; con nivel, solo ese', () => {
     expect(cumpleFiltros(bache({ severidad: 'alta' }), SIN_FILTROS)).toBe(true);
     expect(cumpleFiltros(bache({ severidad: 'alta' }), { ...SIN_FILTROS, nivel: 'alta' })).toBe(true);
