@@ -80,13 +80,18 @@
     @if (urlFoto(); as foto) {
       <img [src]="foto" alt="Foto del bache" class="h-[260px] w-full shrink-0 rounded-2xl bg-superficie object-cover" />
     } @else {
-      <div class="flex h-[260px] shrink-0 flex-col items-center justify-center gap-1.5 rounded-2xl bg-superficie text-apagado">
-        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#5E655F" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <rect x="3" y="5" width="18" height="14" rx="2"></rect>
-          <circle cx="9" cy="10" r="1.6"></circle>
-          <path d="M21 16l-5-5-8 8"></path>
-        </svg>
-        <span class="text-[13px]">Este reporte no tiene foto</span>
+      <!-- Sin foto: se avisa y se invita a sumarlas en los próximos reportes (todavía no se pueden agregar a uno existente). -->
+      <div class="flex shrink-0 flex-col items-center justify-center gap-2 rounded-2xl bg-superficie px-8 py-5 text-center">
+        <span aria-hidden="true" class="flex size-12 items-center justify-center rounded-full bg-white">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#3F6E4A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 8h3l2-3h6l2 3h3v11H4z"></path>
+            <circle cx="12" cy="13" r="3.5"></circle>
+          </svg>
+        </span>
+        <p class="m-0 text-[15px] font-bold text-tinta">Este bache todavía no tiene foto</p>
+        <p class="m-0 text-[13px] leading-[1.45] text-apagado">
+          Una foto ayuda a ver qué tan grave es y a que lo reparen antes. Cuando reportes un bache, ¡acordate de sacarle una!
+        </p>
       </div>
     }
 
