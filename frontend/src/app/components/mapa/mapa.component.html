@@ -242,4 +242,51 @@
 
   <!-- Detalle de un bache (/bache/:id), encima del mapa. -->
   <router-outlet />
+
+  <!-- Carga inicial de los baches (ver cargarBachesExistentes): pin que rebota, o error con "Reintentar". -->
+  @if (carga() !== 'oculta') {
+    <div
+      class="carga-aparecer absolute inset-0 z-1200 flex items-center justify-center bg-fondo/75 px-6 backdrop-blur-[2px] transition-opacity duration-250 ease-out"
+      [class.opacity-0]="carga() === 'saliendo'"
+    >
+      @if (carga() === 'error') {
+        <div role="alert" class="flex w-full max-w-[340px] flex-col items-center gap-3 rounded-3xl bg-white px-6 pt-7 pb-6 text-center shadow-[0_20px_60px_rgba(29,36,32,.2)]">
+          <span aria-hidden="true" class="flex size-14 items-center justify-center rounded-full bg-[#F8DADA]">
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#9E1C1C" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 21s-7-6.2-7-11.5A7 7 0 0119 9.5C19 14.8 12 21 12 21z"></path>
+              <path d="M12 7v3.5M12 13v.01"></path>
+            </svg>
+          </span>
+          <h2 class="m-0 font-sans text-[19px] font-bold tracking-[-0.01em] text-tinta">No pudimos cargar los baches</h2>
+          <p class="m-0 text-[14px] leading-[1.45] text-apagado">Revisá tu conexión e intentá de nuevo en un momento.</p>
+          <button
+            type="button"
+            class="mt-1 h-12 w-full cursor-pointer rounded-2xl border-0 bg-verde text-[15px] font-bold text-white hover:bg-verde-oscuro"
+            (click)="reintentarCarga()"
+          >
+            Reintentar
+          </button>
+          <button
+            type="button"
+            class="cursor-pointer border-0 bg-transparent p-1 text-[13px] font-bold text-apagado underline"
+            (click)="descartarErrorCarga()"
+          >
+            Ver el mapa igual
+          </button>
+        </div>
+      } @else {
+        <div role="status" class="flex flex-col items-center gap-4">
+          <div aria-hidden="true" class="flex flex-col items-center">
+            <span class="carga-pin-rebote">
+              <span class="flex size-12 -rotate-45 items-center justify-center rounded-[50%_50%_50%_0] border-3 border-white bg-verde shadow-[0_6px_14px_rgba(63,110,74,.35)]">
+                <span class="size-3.5 rounded-full bg-white"></span>
+              </span>
+            </span>
+            <span class="carga-sombra-rebote mt-2 h-1.5 w-6 rounded-[50%] bg-tinta/25"></span>
+          </div>
+          <p class="m-0 text-[15px] font-bold text-tinta">Cargando baches…</p>
+        </div>
+      }
+    </div>
+  }
 </div>

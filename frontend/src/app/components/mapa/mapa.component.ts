@@ -72,6 +72,14 @@ const ZOOM_VISTA_GENERAL = 14;
 const ZOOM_MAXIMO_CARTO = 18;
 const ZOOM_MAXIMO_OSM = 19;
 const CLAVE_USUARIO = 'geobaches-usuario';
+/**
+ * Pantalla de carga de los baches: aparece solo si la respuesta tarda más que RETRASO
+ * (así no parpadea cuando el backend contesta rápido), una vez visible queda al menos
+ * MINIMO (para que no sea un destello) y al irse se desvanece en SALIDA.
+ */
+const CARGA_RETRASO = 300;
+const CARGA_MINIMO = 500;
+const CARGA_SALIDA = 250;
 
 @Component({
   selector: 'app-mapa',
@@ -169,6 +177,11 @@ export class MapaComponent implements AfterViewInit, OnDestroy {
   protected readonly aviso = signal<string | null>(null);
   private temporizadorAviso: ReturnType<typeof setTimeout> | undefined;
 
+  /** Pantalla de carga de los baches: oculta, visible, desvaneciéndose o con error (y "Reintentar"). */
+  protected readonly carga = signal<'oculta' | 'visible' | 'saliendo' | 'error'>('oculta');
+  private cargaVisibleDesde = 0;
+  private temporizadorCarga: ReturnType<typeof setTimeout> | undefined;
+
   /** Alto que ocupa el panel inferior: los botones flotantes se acomodan arriba de él. */
   protected readonly alturaHoja = computed(() =>
     this.reportando() ? 0 : this.panelHoja.alto(),
@@ -226,6 +239,7 @@ export class MapaComponent implements AfterViewInit, OnDestroy {
   ngOnDestroy(): void {
     clearTimeout(this.temporizadorAviso);
     clearTimeout(this.temporizadorGeocodificar);
+    clearTimeout(this.temporizadorCarga);
     this.map?.remove();
   }
 
@@ -283,14 +297,57 @@ export class MapaComponent implements AfterViewInit, OnDestroy {
     );
   }
 
-  private cargarBachesExistentes(): void {
+  /** @param inmediato mostrar la pantalla de carga ya (al reintentar: la persona tocó el botón). */
+  private cargarBachesExistentes(inmediato = false): void {
+    clearTimeout(this.temporizadorCarga);
+    let termino = false;
+    if (inmediato) this.mostrarCarga();
+    else {
+      this.carga.set('oculta');
+      this.temporizadorCarga = setTimeout(() => !termino && this.mostrarCarga(), CARGA_RETRASO);
+    }
+
     this.bachesService.cargar().subscribe({
       next: (baches) => {
+        termino = true;
         baches.forEach((bache) => this.registrarMarcador(bache));
         this.sincronizarMarcadores(this.visibles());
+        this.ocultarCarga();
       },
-      error: () => this.error.set('No se pudieron cargar los baches. ¿Está corriendo el backend?'),
+      error: () => {
+        termino = true;
+        clearTimeout(this.temporizadorCarga);
+        this.carga.set('error');
+      },
     });
+  }
+
+  protected reintentarCarga(): void {
+    this.cargarBachesExistentes(true);
+  }
+
+  /** Cerrar el aviso de error y usar el mapa igual (sin baches). */
+  protected descartarErrorCarga(): void {
+    this.carga.set('oculta');
+  }
+
+  private mostrarCarga(): void {
+    this.carga.set('visible');
+    this.cargaVisibleDesde = Date.now();
+  }
+
+  /** Respeta el tiempo mínimo en pantalla y después la desvanece. */
+  private ocultarCarga(): void {
+    clearTimeout(this.temporizadorCarga);
+    if (this.carga() !== 'visible') {
+      this.carga.set('oculta'); // nunca llegó a mostrarse
+      return;
+    }
+    const falta = Math.max(0, CARGA_MINIMO - (Date.now() - this.cargaVisibleDesde));
+    this.temporizadorCarga = setTimeout(() => {
+      this.carga.set('saliendo');
+      this.temporizadorCarga = setTimeout(() => this.carga.set('oculta'), CARGA_SALIDA);
+    }, falta);
   }
 
   private sincronizarMarcadores(visibles: Bache[]): void {

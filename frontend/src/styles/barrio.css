@@ -165,3 +165,14 @@ h1, h2, h3, h4, .disp {
   .marcador-pulso-anillo { animation: none; opacity: 0.2; }
   .marcador-pulso-fuerte { animation: none; opacity: 0.25; transform: scale(1.15); }
 }
+
+/* Pantalla de carga del mapa: pin que rebota sobre su sombra (mapa.component.html). */
+.carga-aparecer { animation: carga-aparecer 0.2s ease-out; }
+@keyframes carga-aparecer { from { opacity: 0; } }
+.carga-pin-rebote { display: block; animation: carga-rebote 0.55s cubic-bezier(0.5, 0, 0.5, 1) infinite alternate; }
+.carga-sombra-rebote { animation: carga-sombra 0.55s cubic-bezier(0.5, 0, 0.5, 1) infinite alternate; }
+@keyframes carga-rebote { from { transform: translateY(0); } to { transform: translateY(-18px); } }
+@keyframes carga-sombra { from { transform: scaleX(1); opacity: 1; } to { transform: scaleX(0.55); opacity: 0.45; } }
+@media (prefers-reduced-motion: reduce) {
+  .carga-aparecer, .carga-pin-rebote, .carga-sombra-rebote { animation: none; }
+}
