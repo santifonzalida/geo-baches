@@ -22,6 +22,8 @@ export class BarraMapaComponent {
   /** Total de baches sin reparar (sin importar los demás filtros): va al lado de esa opción. */
   readonly conteoSinReparar = input(0);
   readonly acercaDe = output<void>();
+  /** "Aplicar": el mapa vuelve a la vista inicial para mostrar el resultado completo. */
+  readonly aplicar = output<void>();
 
   protected readonly abierto = signal(false);
   /** Cantidad de casillas tildadas: el badge del botón. */
@@ -44,6 +46,11 @@ export class BarraMapaComponent {
 
   protected alternarNivel(valor: SeveridadBache): void {
     this.filtros.update((f) => ({ ...f, niveles: alternar(f.niveles, valor) }));
+  }
+
+  protected alAplicar(): void {
+    this.cerrar(true);
+    this.aplicar.emit();
   }
 
   protected limpiar(): void {

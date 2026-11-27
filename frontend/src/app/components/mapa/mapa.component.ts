@@ -68,6 +68,9 @@ const ESPERA_GEOCODIFICAR = 700;
 const ZOOM_PRECISO = 15;
 /** Al cerrar un detalle se aleja al menos hasta acá, para volver a ver los puntos de alrededor. */
 const ZOOM_VISTA_GENERAL = 14;
+/** Vista con la que arranca la app (centro de Córdoba); se vuelve a ella al aplicar filtros. */
+const CENTRO_INICIAL: L.LatLngTuple = [-31.4201, -64.1888];
+const ZOOM_INICIAL = 12;
 /** Último zoom que sirve cada mapa base: CARTO responde 403 desde el 19 y OpenStreetMap llega a 19. */
 const ZOOM_MAXIMO_CARTO = 18;
 const ZOOM_MAXIMO_OSM = 19;
@@ -262,8 +265,8 @@ export class MapaComponent implements AfterViewInit, OnDestroy {
     const capa = this.capaBase();
     // El zoom del mapa no pasa del último que el mapa base puede servir (más allá, mosaicos con error).
     this.map = L.map(this.mapContainer.nativeElement, { zoomControl: false, maxZoom: capa.options.maxZoom }).setView(
-      [-31.4201, -64.1888],
-      12,
+      CENTRO_INICIAL,
+      ZOOM_INICIAL,
     );
 
     capa.addTo(this.map);
@@ -390,6 +393,11 @@ export class MapaComponent implements AfterViewInit, OnDestroy {
         ),
       { enableHighAccuracy: true, timeout: 10000 },
     );
+  }
+
+  /** Al aplicar filtros: vuelve a la vista con la que arranca la app, para ver el resultado completo. */
+  protected volverAVistaInicial(): void {
+    this.map.flyTo(CENTRO_INICIAL, ZOOM_INICIAL, { duration: 0.6 });
   }
 
   protected mostrarAcercaDe(): void {
