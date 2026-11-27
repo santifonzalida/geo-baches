@@ -3,11 +3,10 @@
 
   @if (!reportando() && !panelAbierto()) {
     <app-barra-mapa
-      class="absolute top-3 right-3 left-3 z-1000 md:right-auto md:max-w-[calc(100%-24px)]"
-      [(estado)]="filtroEstado"
-      [(nivel)]="nivelSeleccionado"
+      class="absolute top-3 right-3 left-3 z-1100 md:right-auto md:max-w-[calc(100%-24px)]"
+      [(filtros)]="filtros"
       [(busqueda)]="busqueda"
-      [conteo]="visibles().length"
+      [conteoSinReparar]="cantidadSinReparar()"
       (acercaDe)="mostrarAcercaDe()"
     />
 

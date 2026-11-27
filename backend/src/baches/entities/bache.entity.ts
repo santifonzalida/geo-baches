@@ -1,7 +1,10 @@
 import { Column, CreateDateColumn, Entity, PrimaryGeneratedColumn } from 'typeorm';
 
-export type EstadoBache = 'reportado' | 'en-reparacion' | 'reparado';
+export type EstadoBache = 'reportado' | 'reparado';
 export type SeveridadBache = 'baja' | 'media' | 'alta';
+
+/** Los estados que acepta la API. "En obra" (en-reparacion) ya no se usa. */
+export const ESTADOS_VALIDOS: EstadoBache[] = ['reportado', 'reparado'];
 
 @Entity('baches')
 export class Bache {
@@ -16,6 +19,8 @@ export class Bache {
 
   @Column({
     type: 'enum',
+    // 'en-reparacion' queda en el enum de Postgres a propósito: con synchronize, sacarlo
+    // haría que TypeORM recree el tipo y falle el arranque si alguna fila todavía lo tiene.
     enum: ['reportado', 'en-reparacion', 'reparado'],
     default: 'reportado',
   })

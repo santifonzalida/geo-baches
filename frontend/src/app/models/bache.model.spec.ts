@@ -18,7 +18,7 @@ function bache(datos: Partial<Bache> = {}): Bache {
   };
 }
 
-const SIN_FILTROS: FiltrosMapa = { estado: 'reportado', nivel: null, busqueda: '' };
+const SIN_FILTROS: FiltrosMapa = { estados: ['reportado'], niveles: [], busqueda: '' };
 
 describe('nivelDe', () => {
   it('traduce la severidad del backend al nivel 1/2/3 del diseño', () => {
@@ -29,22 +29,29 @@ describe('nivelDe', () => {
 });
 
 describe('cumpleFiltros', () => {
-  it('muestra solo el estado elegido', () => {
+  it('muestra solo los estados tildados', () => {
     expect(cumpleFiltros(bache(), SIN_FILTROS)).toBe(true);
     expect(cumpleFiltros(bache({ estado: 'reparado' }), SIN_FILTROS)).toBe(false);
   });
 
-  it('"todos" muestra cualquier estado', () => {
-    const todos: FiltrosMapa = { ...SIN_FILTROS, estado: 'todos' };
-    expect(cumpleFiltros(bache({ estado: 'reportado' }), todos)).toBe(true);
-    expect(cumpleFiltros(bache({ estado: 'en-reparacion' }), todos)).toBe(true);
-    expect(cumpleFiltros(bache({ estado: 'reparado' }), todos)).toBe(true);
+  it('dentro de un grupo combina con OR', () => {
+    const ambos: FiltrosMapa = { ...SIN_FILTROS, estados: ['reportado', 'reparado'], niveles: ['alta', 'baja'] };
+    expect(cumpleFiltros(bache({ estado: 'reportado', severidad: 'alta' }), ambos)).toBe(true);
+    expect(cumpleFiltros(bache({ estado: 'reparado', severidad: 'baja' }), ambos)).toBe(true);
+    expect(cumpleFiltros(bache({ severidad: 'media' }), ambos)).toBe(false);
   });
 
-  it('sin nivel elegido muestra todos; con nivel, solo ese', () => {
-    expect(cumpleFiltros(bache({ severidad: 'alta' }), SIN_FILTROS)).toBe(true);
-    expect(cumpleFiltros(bache({ severidad: 'alta' }), { ...SIN_FILTROS, nivel: 'alta' })).toBe(true);
-    expect(cumpleFiltros(bache({ severidad: 'baja' }), { ...SIN_FILTROS, nivel: 'alta' })).toBe(false);
+  it('entre grupos combina con AND', () => {
+    const sinRepararCrater: FiltrosMapa = { ...SIN_FILTROS, niveles: ['alta'] };
+    expect(cumpleFiltros(bache({ severidad: 'alta' }), sinRepararCrater)).toBe(true);
+    expect(cumpleFiltros(bache({ severidad: 'media' }), sinRepararCrater)).toBe(false);
+    expect(cumpleFiltros(bache({ estado: 'reparado', severidad: 'alta' }), sinRepararCrater)).toBe(false);
+  });
+
+  it('un grupo sin nada tildado no filtra por ese criterio', () => {
+    const nada: FiltrosMapa = { estados: [], niveles: [], busqueda: '' };
+    expect(cumpleFiltros(bache({ estado: 'reparado', severidad: 'baja' }), nada)).toBe(true);
+    expect(cumpleFiltros(bache({ estado: 'reportado', severidad: 'alta' }), nada)).toBe(true);
   });
 
   it('busca por calle, calle + altura o barrio, sin importar mayúsculas ni tildes', () => {

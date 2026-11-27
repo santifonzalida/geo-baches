@@ -1,7 +1,6 @@
-<!-- Celular: buscador arriba y chips con scroll horizontal. Escritorio: todo en una fila, con el ancho que necesite. -->
-<div class="flex flex-col gap-2.5 md:flex-row md:flex-wrap md:items-center">
-  <div class="flex items-center gap-2.5 md:contents">
-    <div class="flex h-[52px] min-w-0 flex-1 items-center md:order-1 md:w-[340px] md:flex-none gap-2.5 rounded-2xl bg-white py-1.5 pr-3 pl-3.5 shadow-[0_4px_16px_rgba(29,36,32,.12)]">
+<div class="flex flex-col items-start gap-2.5">
+  <div class="flex w-full items-center gap-2.5 md:w-auto">
+    <div class="flex h-[52px] min-w-0 flex-1 items-center gap-2.5 rounded-2xl bg-white py-1.5 pr-3 pl-3.5 shadow-[0_4px_16px_rgba(29,36,32,.12)] md:w-[340px] md:flex-none">
       <div aria-hidden="true" class="flex size-6 shrink-0 items-center justify-center rounded-full bg-verde">
         <div class="size-[9px] rounded-full bg-white"></div>
       </div>
@@ -21,7 +20,7 @@
     <button
       type="button"
       aria-label="Acerca de GeoBaches"
-      class="flex size-[52px] shrink-0 cursor-pointer md:order-2 items-center justify-center rounded-2xl border-0 bg-white shadow-[0_4px_16px_rgba(29,36,32,.12)]"
+      class="flex size-[52px] shrink-0 cursor-pointer items-center justify-center rounded-2xl border-0 bg-white shadow-[0_4px_16px_rgba(29,36,32,.12)]"
       (click)="acercaDe.emit()"
     >
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1D2420" stroke-width="2" stroke-linecap="round" aria-hidden="true">
@@ -31,42 +30,104 @@
     </button>
   </div>
 
-  <div class="sin-scrollbar flex gap-2 overflow-x-auto pb-1 md:order-3 md:flex-wrap md:overflow-visible md:pb-0">
-    @for (opcion of estados; track opcion.valor) {
-      @if (estado() === opcion.valor) {
-        <button
-          type="button"
-          aria-pressed="true"
-          class="flex h-9 shrink-0 cursor-pointer items-center gap-2 rounded-[18px] border-0 bg-tinta pr-1.5 pl-3.5 text-sm font-medium text-white"
-        >
-          {{ opcion.filtro }}
-          <span class="flex h-6 min-w-6 items-center justify-center rounded-xl bg-white/20 px-1.5 text-xs font-bold">{{ conteo() }}</span>
-        </button>
-      } @else {
-        <button
-          type="button"
-          aria-pressed="false"
-          class="h-9 shrink-0 cursor-pointer rounded-[18px] border-0 bg-white px-3.5 text-sm font-medium text-tinta shadow-[0_2px_8px_rgba(29,36,32,.10)]"
-          (click)="estado.set(opcion.valor)"
-        >
-          {{ opcion.filtro }}
-        </button>
+  <div class="relative">
+    <button
+      #botonFiltros
+      type="button"
+      class="flex h-10 cursor-pointer items-center gap-2 rounded-full border-0 bg-white pr-3 pl-3.5 text-sm font-bold text-tinta shadow-[0_2px_8px_rgba(29,36,32,.12)]"
+      aria-controls="panel-filtros"
+      [attr.aria-expanded]="abierto()"
+      (click)="alternarPanel()"
+    >
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1D2420" stroke-width="2.2" stroke-linecap="round" aria-hidden="true">
+        <path d="M4 7h16M7 12h10M10 17h4"></path>
+      </svg>
+      Filtros
+      @if (activos() > 0) {
+        <span class="flex h-[22px] min-w-[22px] items-center justify-center rounded-full bg-verde px-1.5 text-xs font-bold text-white">
+          {{ activos() }}<span class="sr-only">{{ activos() === 1 ? ' filtro activo' : ' filtros activos' }}</span>
+        </span>
       }
-    }
-
-    <div aria-hidden="true" class="h-[22px] w-px shrink-0 self-center bg-tinta/20"></div>
-
-    @for (opcion of niveles; track opcion.valor) {
-      <button
-        type="button"
-        class="flex h-9 shrink-0 cursor-pointer items-center gap-1.5 rounded-[18px] border-0 pr-3.5 pl-2.5 text-sm font-medium shadow-[0_2px_8px_rgba(29,36,32,.10)]"
-        [attr.aria-pressed]="nivel() === opcion.valor"
-        [class]="nivel() === opcion.valor ? 'bg-tinta text-white' : 'bg-white text-tinta'"
-        (click)="alternarNivel(opcion.valor)"
+      <svg
+        width="16"
+        height="16"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="#1D2420"
+        stroke-width="2.2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        aria-hidden="true"
+        class="transition-transform duration-200"
+        [class.rotate-180]="abierto()"
       >
-        <span aria-hidden="true" class="size-3 rounded-full" [style.background]="opcion.color"></span>
-        {{ opcion.etiqueta }}
-      </button>
-    }
+        <path d="M6 9l6 6 6-6"></path>
+      </svg>
+    </button>
+
+    <!-- En el DOM siempre (oculto con hidden), así aria-controls siempre apunta a algo. -->
+    <div
+      id="panel-filtros"
+      class="absolute top-[calc(100%+8px)] left-0 z-10 box-border w-[272px] rounded-2xl bg-white pt-2 shadow-[0_10px_32px_rgba(29,36,32,.20)]"
+      [hidden]="!abierto()"
+    >
+      <fieldset class="m-0 border-0 px-4 pt-2 pb-1">
+        <legend class="float-left mb-1 w-full p-0 text-xs font-bold tracking-[.04em] text-apagado uppercase">Estado</legend>
+        @for (estado of estados; track estado.valor) {
+          <label class="clear-both flex min-h-11 cursor-pointer items-center gap-3 text-[15px] text-tinta">
+            <input
+              type="checkbox"
+              class="m-0 size-5 shrink-0 cursor-pointer accent-verde"
+              [checked]="filtros().estados.includes(estado.valor)"
+              (change)="alternarEstado(estado.valor)"
+            />
+            <span class="flex-1">{{ estado.filtro }}</span>
+            @if (estado.valor === 'reportado') {
+              <span class="text-sm text-apagado">{{ conteoSinReparar() }}</span>
+            }
+          </label>
+        }
+      </fieldset>
+
+      <div aria-hidden="true" class="mx-4 h-px bg-separador"></div>
+
+      <fieldset class="m-0 border-0 px-4 pt-3 pb-1">
+        <legend class="float-left mb-1 w-full p-0 text-xs font-bold tracking-[.04em] text-apagado uppercase">Gravedad</legend>
+        @for (nivel of niveles; track nivel.valor) {
+          <label class="clear-both flex min-h-11 cursor-pointer items-center gap-3 text-[15px] text-tinta">
+            <input
+              type="checkbox"
+              class="m-0 size-5 shrink-0 cursor-pointer accent-verde"
+              [checked]="filtros().niveles.includes(nivel.valor)"
+              (change)="alternarNivel(nivel.valor)"
+            />
+            <span class="flex-1">{{ nivel.etiqueta }}</span>
+            <span
+              aria-hidden="true"
+              class="flex size-6 shrink-0 items-center justify-center rounded-full text-xs font-bold"
+              [style.background]="nivel.color"
+              [style.color]="nivel.tinta"
+            >{{ nivel.nivel }}</span>
+          </label>
+        }
+      </fieldset>
+
+      <div class="grid grid-cols-2 gap-2.5 px-4 pt-2 pb-4">
+        <button
+          type="button"
+          class="h-11 cursor-pointer rounded-xl border-[1.5px] border-solid border-[#CFCBC1] bg-white text-[15px] font-bold text-tinta hover:bg-superficie"
+          (click)="limpiar()"
+        >
+          Limpiar
+        </button>
+        <button
+          type="button"
+          class="h-11 cursor-pointer rounded-xl border-0 bg-verde text-[15px] font-bold text-white hover:bg-verde-oscuro"
+          (click)="cerrar(true)"
+        >
+          Aplicar
+        </button>
+      </div>
+    </div>
   </div>
 </div>

@@ -32,8 +32,8 @@ import {
   Bache,
   COLOR_REPARADO,
   cumpleFiltros,
-  FILTROS_ESTADO,
-  FiltroEstado,
+  ESTADOS_BACHE,
+  FILTROS_POR_DEFECTO,
   formatearDireccion,
   nivelDe,
   SeveridadBache,
@@ -118,9 +118,13 @@ export class MapaComponent implements AfterViewInit, OnDestroy {
   protected readonly baches = this.bachesService.baches;
 
   // Filtros de la barra
-  protected readonly filtroEstado = signal<FiltroEstado>('reportado');
-  protected readonly nivelSeleccionado = signal<SeveridadBache | null>(null);
+  /** Lo tildado en el dropdown "Filtros" (estados y niveles por separado). */
+  protected readonly filtros = signal(FILTROS_POR_DEFECTO);
   protected readonly busqueda = signal('');
+  /** Total de baches sin reparar, sin importar los otros filtros: el conteo del dropdown. */
+  protected readonly cantidadSinReparar = computed(
+    () => this.baches().filter((bache) => bache.estado === 'reportado').length,
+  );
 
   /** "Reportes recientes": se pliega o abre tocando el encabezado (y arrastrándolo, en celular). */
   protected readonly panelHoja = new PanelArrastrable(() => ALTURA_HOJA_ABIERTA, {
@@ -143,7 +147,7 @@ export class MapaComponent implements AfterViewInit, OnDestroy {
   private readonly limites = signal<L.LatLngBounds | null>(null);
 
   protected readonly visibles = computed(() => {
-    const filtros = { estado: this.filtroEstado(), nivel: this.nivelSeleccionado(), busqueda: this.busqueda() };
+    const filtros = { ...this.filtros(), busqueda: this.busqueda() };
     return this.baches().filter((bache) => cumpleFiltros(bache, filtros));
   });
 
@@ -157,9 +161,11 @@ export class MapaComponent implements AfterViewInit, OnDestroy {
 
   protected readonly subtituloHoja = computed(() => {
     const cantidad = this.enZona().length;
-    if (this.filtroEstado() === 'todos') return `${cantidad} ${cantidad === 1 ? 'reporte' : 'reportes'} en esta zona`;
-    const estado = FILTROS_ESTADO.find((e) => e.valor === this.filtroEstado());
-    return `${cantidad} ${estado?.filtro.toLowerCase()} en esta zona`;
+    // Con un solo estado tildado se nombra ("N sin reparar"); si no, "N reportes".
+    const { estados } = this.filtros();
+    const estado = estados.length === 1 ? ESTADOS_BACHE.find((e) => e.valor === estados[0]) : undefined;
+    if (estado) return `${cantidad} ${(cantidad === 1 ? estado.etiqueta : estado.filtro).toLowerCase()} en esta zona`;
+    return `${cantidad} ${cantidad === 1 ? 'reporte' : 'reportes'} en esta zona`;
   });
 
   // Reporte
@@ -676,8 +682,8 @@ export class MapaComponent implements AfterViewInit, OnDestroy {
   }
 
   /**
-   * Círculo con el número de nivel (1/2/3) y el color del diseño. "En obra" suma una
-   * insignia con una llave; "arreglado" pasa a verde con un tilde en lugar del número.
+   * Círculo con el número de nivel (1/2/3) y el color del diseño; "arreglado" pasa a
+   * verde con un tilde en lugar del número.
    * Destacado (el del detalle abierto): más grande y con un anillo pulsante del mismo color.
    */
   private crearIcono(bache: Bache, destacado = false): L.DivIcon {
@@ -689,12 +695,8 @@ export class MapaComponent implements AfterViewInit, OnDestroy {
     const contenido = arreglado
       ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"/></svg>'
       : String(nivel.nivel);
-    const insigniaObra =
-      bache.estado === 'en-reparacion'
-        ? '<span style="position:absolute;right:-5px;bottom:-5px;width:17px;height:17px;border-radius:50%;background:#1D2420;border:2px solid #FFFFFF;box-sizing:border-box;display:flex;align-items:center;justify-content:center"><svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg></span>'
-        : '';
 
-    const circulo = `<span style="position:relative;width:${tamano}px;height:${tamano}px;border-radius:50%;background:${fondo};border:3px solid #FFFFFF;box-shadow:0 ${destacado ? '3px 10px rgba(0,0,0,.35)' : '2px 6px rgba(0,0,0,.3)'};box-sizing:border-box;color:${tinta};font:700 ${destacado ? 16 : 13}px 'DM Sans',system-ui,sans-serif;display:flex;align-items:center;justify-content:center">${contenido}${insigniaObra}</span>`;
+    const circulo = `<span style="position:relative;width:${tamano}px;height:${tamano}px;border-radius:50%;background:${fondo};border:3px solid #FFFFFF;box-shadow:0 ${destacado ? '3px 10px rgba(0,0,0,.35)' : '2px 6px rgba(0,0,0,.3)'};box-sizing:border-box;color:${tinta};font:700 ${destacado ? 16 : 13}px 'DM Sans',system-ui,sans-serif;display:flex;align-items:center;justify-content:center">${contenido}</span>`;
     // Destacado: un anillo pulsante del color del círculo (.marcador-pulso-fuerte, barrio.css),
     // sin halo fijo de fondo. El contenedor de 58 px es la base de la que crece el anillo.
     const base = 58;

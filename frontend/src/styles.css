@@ -17,7 +17,3 @@
   --color-separador: #EFEDE7;
   --color-ubicacion: #2B6CD6;
 }
-
-/* Chips con scroll horizontal sin barra visible. */
-.sin-scrollbar { scrollbar-width: none; }
-.sin-scrollbar::-webkit-scrollbar { display: none; }

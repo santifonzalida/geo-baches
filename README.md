@@ -35,7 +35,6 @@ Hacer un mapa público, sin registro y pensado para el celular, donde cualquiera
 Vecino reporta ──► Pendiente de revisión ──► Aprobado (visible en el mapa)
                          │                         │
                          └──► Rechazado (se borra) ├─ Sin reparar
-                                                   ├─ En obra
                                                    └─ Arreglado
 ```
 

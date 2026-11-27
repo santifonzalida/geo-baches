@@ -61,7 +61,7 @@ export class AdminDashboardComponent implements OnInit {
   protected readonly pendientes = computed(() => this.baches().filter((b) => !b.revisado).length);
   protected readonly aprobados = computed(() => this.baches().filter((b) => b.revisado).length);
   protected readonly porEstado = computed(() => {
-    const conteo: Record<EstadoBache, number> = { reportado: 0, 'en-reparacion': 0, reparado: 0 };
+    const conteo: Record<EstadoBache, number> = { reportado: 0, reparado: 0 };
     this.baches()
       .filter((b) => b.revisado)
       .forEach((b) => conteo[b.estado]++);

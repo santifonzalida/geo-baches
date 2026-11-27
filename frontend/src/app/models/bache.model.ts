@@ -1,4 +1,4 @@
-export type EstadoBache = 'reportado' | 'en-reparacion' | 'reparado';
+export type EstadoBache = 'reportado' | 'reparado';
 export type SeveridadBache = 'baja' | 'media' | 'alta';
 
 export interface Bache {
@@ -71,10 +71,9 @@ export function formatearDireccion(b: Pick<Bache, 'calle' | 'altura' | 'barrio' 
 /** Cuando el estado es reparado, el verde gana por sobre el color del nivel. */
 export const COLOR_REPARADO = '#3F6E4A';
 
-/** `filtro`: como se lee en los chips del mapa ("Arreglados", en plural). */
+/** `filtro`: como se lee en el dropdown de filtros del mapa ("Arreglados", en plural). */
 export const ESTADOS_BACHE: { valor: EstadoBache; etiqueta: string; filtro: string }[] = [
   { valor: 'reportado', etiqueta: 'Sin reparar', filtro: 'Sin reparar' },
-  { valor: 'en-reparacion', etiqueta: 'En obra', filtro: 'En obra' },
   { valor: 'reparado', etiqueta: 'Arreglado', filtro: 'Arreglados' },
 ];
 
@@ -148,22 +147,16 @@ export function nivelDe(severidad: SeveridadBache): NivelBache {
   return SEVERIDADES_BACHE.find((s) => s.valor === severidad) ?? SEVERIDADES_BACHE[1];
 }
 
-/** Filtro de estado del mapa: uno de los estados, o todos juntos. */
-export type FiltroEstado = EstadoBache | 'todos';
+/** Lo tildado en el dropdown "Filtros" del mapa. Un grupo vacío no filtra por ese criterio. */
+export interface SeleccionFiltros {
+  estados: EstadoBache[];
+  niveles: SeveridadBache[];
+}
 
-/**
- * Chips de estado de la pantalla del mapa: "Todos" primero y después los estados.
- * "En obra" no tiene chip propio: esos baches se ven con "Todos".
- */
-export const FILTROS_ESTADO: { valor: FiltroEstado; filtro: string }[] = [
-  { valor: 'todos', filtro: 'Todos' },
-  ...ESTADOS_BACHE.filter(({ valor }) => valor !== 'en-reparacion').map(({ valor, filtro }) => ({ valor, filtro })),
-];
+/** Por defecto el mapa muestra solo lo que falta arreglar. */
+export const FILTROS_POR_DEFECTO: SeleccionFiltros = { estados: ['reportado'], niveles: [] };
 
-export interface FiltrosMapa {
-  estado: FiltroEstado;
-  /** null: todos los niveles. */
-  nivel: SeveridadBache | null;
+export interface FiltrosMapa extends SeleccionFiltros {
   busqueda: string;
 }
 
@@ -172,10 +165,13 @@ function normalizarTexto(texto: string): string {
   return texto.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
 }
 
-/** Si un bache se muestra (en el mapa y en la lista) con los filtros de la pantalla del mapa. */
+/**
+ * Si un bache se muestra (en el mapa y en la lista) con los filtros de la pantalla del mapa.
+ * Dentro de un grupo, OR (cualquiera de los tildados); entre grupos y con la búsqueda, AND.
+ */
 export function cumpleFiltros(bache: Bache, filtros: FiltrosMapa): boolean {
-  if (filtros.estado !== 'todos' && bache.estado !== filtros.estado) return false;
-  if (filtros.nivel && bache.severidad !== filtros.nivel) return false;
+  if (filtros.estados.length && !filtros.estados.includes(bache.estado)) return false;
+  if (filtros.niveles.length && !filtros.niveles.includes(bache.severidad)) return false;
 
   const texto = normalizarTexto(filtros.busqueda);
   if (!texto) return true;

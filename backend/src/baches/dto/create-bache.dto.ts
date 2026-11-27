@@ -1,6 +1,6 @@
 import { Type } from 'class-transformer';
 import { IsIn, IsNotEmpty, IsNumber, IsOptional, IsString, MaxLength } from 'class-validator';
-import { EstadoBache, SeveridadBache } from '../entities/bache.entity';
+import { ESTADOS_VALIDOS, EstadoBache, SeveridadBache } from '../entities/bache.entity';
 
 export class CreateBacheDto {
   @Type(() => Number)
@@ -11,7 +11,7 @@ export class CreateBacheDto {
   @IsNumber()
   lng: number;
 
-  @IsIn(['reportado', 'en-reparacion', 'reparado'])
+  @IsIn(ESTADOS_VALIDOS)
   estado: EstadoBache;
 
   @IsIn(['baja', 'media', 'alta'])
