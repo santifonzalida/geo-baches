@@ -25,9 +25,9 @@ Hacer un mapa público, sin registro y pensado para el celular, donde cualquiera
 
 | Nivel | Nombre | Qué significa |
 |---|---|---|
-| 1 | **Leve** | Se ve de lejos y se puede esquivar sin frenar. |
+| 1 | **Leve** | Bache chico y poco profundo. Se esquiva fácil. |
 | 2 | **Rompe autos** | Golpe fuerte: riesgo para cubiertas, llantas y tren delantero. |
-| 3 | **Cráter** | Profundo o difícil de ver. Peligro real para motos y bicis. |
+| 3 | **Cráter** | Bache muy profundo: rotura segura del auto y peligro de vida para motos y bicis. |
 
 ### Ciclo de vida de un reporte
 
